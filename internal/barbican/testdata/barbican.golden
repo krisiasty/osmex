@@ -1,0 +1,8 @@
+# HELP openstack_secret_info Secret information for secrets with an expiration; the value is always 1.
+# TYPE openstack_secret_info gauge
+openstack_secret_info{id="s1",name="tls-cert",secret_type="certificate",algorithm="rsa"} 1
+openstack_secret_info{id="s2",name="db-key",secret_type="symmetric",algorithm=""} 1
+# HELP openstack_secret_expiration_timestamp_seconds Time after which the secret can no longer be retrieved.
+# TYPE openstack_secret_expiration_timestamp_seconds gauge
+openstack_secret_expiration_timestamp_seconds{id="s1"} 1.7960832e+09
+openstack_secret_expiration_timestamp_seconds{id="s2"} 1.8000162e+09

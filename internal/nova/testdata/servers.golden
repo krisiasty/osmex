@@ -1,0 +1,113 @@
+# HELP openstack_server_info Server information; the value is always 1.
+# TYPE openstack_server_info gauge
+openstack_server_info{id="a1",name="web-01",flavor="m1.small",availability_zone="nova",host_id="h1",image_id="img-1"} 1
+openstack_server_info{id="b2",name="db-01",flavor="m1.large",availability_zone="nova",host_id="h2",image_id="img-1"} 1
+openstack_server_info{id="c3",name="broken",flavor="m1.small",availability_zone="",host_id="",image_id="img-2"} 1
+openstack_server_info{id="d4",name="bfv",flavor="v1.medium",availability_zone="",host_id="h1",image_id=""} 1
+openstack_server_info{id="e5",name="web \"1\"\nb\\",flavor="m1.small",availability_zone="nova",host_id="h3",image_id="img-1"} 1
+openstack_server_info{id="f6",name="rebooting",flavor="m1.small",availability_zone="nova",host_id="h3",image_id="img-1"} 1
+openstack_server_info{id="g7",name="locked",flavor="m1.small",availability_zone="nova",host_id="h2",image_id="img-1"} 1
+# HELP openstack_server_up 1 if the server is ACTIVE and its power state is RUNNING, else 0.
+# TYPE openstack_server_up gauge
+openstack_server_up{id="a1"} 1
+openstack_server_up{id="b2"} 0
+openstack_server_up{id="c3"} 0
+openstack_server_up{id="d4"} 1
+openstack_server_up{id="e5"} 1
+openstack_server_up{id="f6"} 0
+openstack_server_up{id="g7"} 1
+# HELP openstack_server_status Current server status; the value is always 1.
+# TYPE openstack_server_status gauge
+openstack_server_status{id="a1",status="ACTIVE"} 1
+openstack_server_status{id="b2",status="SHUTOFF"} 1
+openstack_server_status{id="c3",status="ERROR"} 1
+openstack_server_status{id="d4",status="ACTIVE"} 1
+openstack_server_status{id="e5",status="ACTIVE"} 1
+openstack_server_status{id="f6",status="REBOOT"} 1
+openstack_server_status{id="g7",status="ACTIVE"} 1
+openstack_server_status{id="x9",status="UNKNOWN"} 1
+# HELP openstack_server_vm_state Current server VM state; the value is always 1.
+# TYPE openstack_server_vm_state gauge
+openstack_server_vm_state{id="a1",vm_state="active"} 1
+openstack_server_vm_state{id="b2",vm_state="stopped"} 1
+openstack_server_vm_state{id="c3",vm_state="error"} 1
+openstack_server_vm_state{id="d4",vm_state="active"} 1
+openstack_server_vm_state{id="e5",vm_state="active"} 1
+openstack_server_vm_state{id="f6",vm_state="active"} 1
+openstack_server_vm_state{id="g7",vm_state="active"} 1
+# HELP openstack_server_power_state Server power state; the power_state label names it and the value is its Nova code (0 nostate, 1 running, 3 paused, 4 shutdown, 6 crashed, 7 suspended). Use max by (id) for one series per server.
+# TYPE openstack_server_power_state gauge
+openstack_server_power_state{id="a1",power_state="running"} 1
+openstack_server_power_state{id="b2",power_state="shutdown"} 4
+openstack_server_power_state{id="c3",power_state="nostate"} 0
+openstack_server_power_state{id="d4",power_state="running"} 1
+openstack_server_power_state{id="e5",power_state="running"} 1
+openstack_server_power_state{id="f6",power_state="running"} 1
+openstack_server_power_state{id="g7",power_state="running"} 1
+# HELP openstack_server_task_state 1 while a task runs on the server; absent when idle.
+# TYPE openstack_server_task_state gauge
+openstack_server_task_state{id="f6",task_state="rebooting"} 1
+# HELP openstack_server_launched_timestamp_seconds Time the server was last launched (OS-SRV-USG:launched_at).
+# TYPE openstack_server_launched_timestamp_seconds gauge
+openstack_server_launched_timestamp_seconds{id="a1"} 1.79084883e+09
+openstack_server_launched_timestamp_seconds{id="b2"} 1.79084883e+09
+openstack_server_launched_timestamp_seconds{id="e5"} 1.79092804e+09
+openstack_server_launched_timestamp_seconds{id="f6"} 1.79092804e+09
+openstack_server_launched_timestamp_seconds{id="g7"} 1.79092804e+09
+# HELP openstack_server_updated_timestamp_seconds Time the server record was last updated.
+# TYPE openstack_server_updated_timestamp_seconds gauge
+openstack_server_updated_timestamp_seconds{id="a1"} 1.791385419e+09
+openstack_server_updated_timestamp_seconds{id="b2"} 1.7913852e+09
+openstack_server_updated_timestamp_seconds{id="c3"} 1.7913744e+09
+openstack_server_updated_timestamp_seconds{id="d4"} 1.79092806e+09
+openstack_server_updated_timestamp_seconds{id="e5"} 1.79092806e+09
+openstack_server_updated_timestamp_seconds{id="f6"} 1.7913858e+09
+openstack_server_updated_timestamp_seconds{id="g7"} 1.79092806e+09
+# HELP openstack_server_created_timestamp_seconds Time the server was created.
+# TYPE openstack_server_created_timestamp_seconds gauge
+openstack_server_created_timestamp_seconds{id="a1"} 1.7908488e+09
+openstack_server_created_timestamp_seconds{id="b2"} 1.7908488e+09
+openstack_server_created_timestamp_seconds{id="c3"} 1.79137434e+09
+openstack_server_created_timestamp_seconds{id="d4"} 1.790928e+09
+openstack_server_created_timestamp_seconds{id="e5"} 1.790928e+09
+openstack_server_created_timestamp_seconds{id="f6"} 1.790928e+09
+openstack_server_created_timestamp_seconds{id="g7"} 1.790928e+09
+# HELP openstack_server_locked 1 if the server is locked, else 0.
+# TYPE openstack_server_locked gauge
+openstack_server_locked{id="a1"} 0
+openstack_server_locked{id="b2"} 0
+openstack_server_locked{id="c3"} 0
+openstack_server_locked{id="d4"} 0
+openstack_server_locked{id="e5"} 0
+openstack_server_locked{id="f6"} 0
+openstack_server_locked{id="g7"} 1
+# HELP openstack_server_fault_timestamp_seconds Time of the server fault; present only in ERROR status.
+# TYPE openstack_server_fault_timestamp_seconds gauge
+openstack_server_fault_timestamp_seconds{id="c3",code="500"} 1.7913744e+09
+# HELP openstack_server_vcpus vCPUs of the server flavor.
+# TYPE openstack_server_vcpus gauge
+openstack_server_vcpus{id="a1"} 1
+openstack_server_vcpus{id="b2"} 4
+openstack_server_vcpus{id="c3"} 1
+openstack_server_vcpus{id="d4"} 2
+openstack_server_vcpus{id="e5"} 1
+openstack_server_vcpus{id="f6"} 1
+openstack_server_vcpus{id="g7"} 1
+# HELP openstack_server_memory_bytes Memory of the server flavor in bytes.
+# TYPE openstack_server_memory_bytes gauge
+openstack_server_memory_bytes{id="a1"} 2.147483648e+09
+openstack_server_memory_bytes{id="b2"} 8.589934592e+09
+openstack_server_memory_bytes{id="c3"} 2.147483648e+09
+openstack_server_memory_bytes{id="d4"} 4.294967296e+09
+openstack_server_memory_bytes{id="e5"} 2.147483648e+09
+openstack_server_memory_bytes{id="f6"} 2.147483648e+09
+openstack_server_memory_bytes{id="g7"} 2.147483648e+09
+# HELP openstack_server_root_disk_bytes Root disk of the server flavor in bytes; 0 for volume-backed flavors.
+# TYPE openstack_server_root_disk_bytes gauge
+openstack_server_root_disk_bytes{id="a1"} 2.147483648e+10
+openstack_server_root_disk_bytes{id="b2"} 8.589934592e+10
+openstack_server_root_disk_bytes{id="c3"} 2.147483648e+10
+openstack_server_root_disk_bytes{id="d4"} 0
+openstack_server_root_disk_bytes{id="e5"} 2.147483648e+10
+openstack_server_root_disk_bytes{id="f6"} 2.147483648e+10
+openstack_server_root_disk_bytes{id="g7"} 2.147483648e+10

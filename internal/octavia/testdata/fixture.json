@@ -1,0 +1,32 @@
+{
+  "loadbalancers": [
+    {"id": "lb1", "name": "web", "provider": "amphora", "availability_zone": "az1", "operating_status": "ONLINE", "provisioning_status": "ACTIVE", "updated_at": "2026-10-31T21:07:03"},
+    {"id": "lb2", "name": "api", "provider": "ovn", "availability_zone": null, "operating_status": "DEGRADED", "provisioning_status": "PENDING_UPDATE", "updated_at": "2026-10-31T21:08:49"},
+    {"id": "lb3", "name": "broken", "provider": "amphora", "availability_zone": "az1", "operating_status": "OFFLINE", "provisioning_status": "ERROR", "updated_at": "2026-10-31T20:55:12"}
+  ],
+  "statuses": {
+    "lb1": {"statuses": {"loadbalancer": {"id": "lb1", "name": "web", "operating_status": "ONLINE", "provisioning_status": "ACTIVE", "listeners": [
+      {"id": "l1", "name": "http", "operating_status": "ONLINE", "provisioning_status": "ACTIVE", "pools": [
+        {"id": "pl1", "name": "web-pool", "operating_status": "ONLINE", "provisioning_status": "ACTIVE", "members": [
+          {"id": "m1", "name": "web-1", "operating_status": "ONLINE", "provisioning_status": "ACTIVE", "address": "10.0.0.1", "protocol_port": 80},
+          {"id": "m2", "name": "web-2", "operating_status": "ERROR", "provisioning_status": "ACTIVE", "address": "10.0.0.2", "protocol_port": 80}
+        ]}
+      ]},
+      {"id": "l2", "name": "alt", "operating_status": "ONLINE", "provisioning_status": "ACTIVE", "pools": [
+        {"id": "pl1", "name": "web-pool", "operating_status": "ONLINE", "provisioning_status": "ACTIVE", "members": [
+          {"id": "m1", "name": "web-1", "operating_status": "ONLINE", "provisioning_status": "ACTIVE", "address": "10.0.0.1", "protocol_port": 80},
+          {"id": "m2", "name": "web-2", "operating_status": "ERROR", "provisioning_status": "ACTIVE", "address": "10.0.0.2", "protocol_port": 80}
+        ]}
+      ]}
+    ]}}},
+    "lb2": {"statuses": {"loadbalancer": {"id": "lb2", "name": "api", "operating_status": "DEGRADED", "provisioning_status": "PENDING_UPDATE", "listeners": [
+      {"id": "l3", "name": "https", "operating_status": "DEGRADED", "provisioning_status": "PENDING_UPDATE", "pools": [
+        {"id": "pl2", "name": "api-pool", "operating_status": "DEGRADED", "provisioning_status": "ACTIVE", "members": [
+          {"id": "m3", "name": "api \"x\"", "operating_status": "NO_MONITOR", "provisioning_status": "ACTIVE", "address": "10.0.1.1", "protocol_port": 443},
+          {"id": "m4", "name": "", "operating_status": "OFFLINE", "provisioning_status": "ACTIVE", "address": "10.0.1.2", "protocol_port": 443}
+        ]}
+      ]}
+    ]}}},
+    "lb3": {"statuses": {"loadbalancer": {"id": "lb3", "name": "broken", "operating_status": "OFFLINE", "provisioning_status": "ERROR", "listeners": []}}}
+  }
+}

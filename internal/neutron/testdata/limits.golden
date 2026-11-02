@@ -1,0 +1,15 @@
+# HELP openstack_network_quota_limit Network quota limit by resource.
+# TYPE openstack_network_quota_limit gauge
+openstack_network_quota_limit{resource="floating_ips"} 5
+openstack_network_quota_limit{resource="networks"} 10
+openstack_network_quota_limit{resource="ports"} 100
+openstack_network_quota_limit{resource="routers"} 3
+openstack_network_quota_limit{resource="security_groups"} 10
+# HELP openstack_network_quota_used Network quota usage by resource.
+# TYPE openstack_network_quota_used gauge
+openstack_network_quota_used{resource="floating_ips"} 3
+openstack_network_quota_used{resource="networks"} 2
+openstack_network_quota_used{resource="ports"} 12
+openstack_network_quota_used{resource="routers"} 1
+openstack_network_quota_used{resource="security_group_rules"} 40
+openstack_network_quota_used{resource="security_groups"} 2

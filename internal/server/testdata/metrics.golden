@@ -1,0 +1,55 @@
+a_metric 1
+# HELP openstack_exporter_build_info Build information of the exporter.
+# TYPE openstack_exporter_build_info gauge
+openstack_exporter_build_info{version="v1.0.0",goversion="go1.27.3"} 1
+# HELP openstack_exporter_auth_up Whether the exporter holds a valid Keystone token.
+# TYPE openstack_exporter_auth_up gauge
+openstack_exporter_auth_up 1
+# HELP openstack_exporter_api_up Whether the last poll succeeded.
+# TYPE openstack_exporter_api_up gauge
+openstack_exporter_api_up{poller="a"} 1
+openstack_exporter_api_up{poller="b"} 0
+# HELP openstack_exporter_last_success_timestamp_seconds Time of the last successful poll.
+# TYPE openstack_exporter_last_success_timestamp_seconds gauge
+openstack_exporter_last_success_timestamp_seconds{poller="a"} 1.8e+09
+# HELP openstack_exporter_data_age_seconds Age of the data being served.
+# TYPE openstack_exporter_data_age_seconds gauge
+openstack_exporter_data_age_seconds{poller="a"} 15
+# HELP openstack_exporter_poll_duration_seconds Duration of the last poll.
+# TYPE openstack_exporter_poll_duration_seconds gauge
+openstack_exporter_poll_duration_seconds{poller="a"} 0
+openstack_exporter_poll_duration_seconds{poller="b"} 0
+# HELP openstack_exporter_api_errors_total Failed OpenStack API requests by error code.
+# TYPE openstack_exporter_api_errors_total counter
+openstack_exporter_api_errors_total{poller="a",code="401"} 0
+openstack_exporter_api_errors_total{poller="a",code="403"} 0
+openstack_exporter_api_errors_total{poller="a",code="404"} 0
+openstack_exporter_api_errors_total{poller="a",code="429"} 0
+openstack_exporter_api_errors_total{poller="a",code="500"} 0
+openstack_exporter_api_errors_total{poller="a",code="502"} 0
+openstack_exporter_api_errors_total{poller="a",code="503"} 0
+openstack_exporter_api_errors_total{poller="a",code="504"} 0
+openstack_exporter_api_errors_total{poller="a",code="auth"} 0
+openstack_exporter_api_errors_total{poller="a",code="catalog"} 0
+openstack_exporter_api_errors_total{poller="a",code="decode"} 0
+openstack_exporter_api_errors_total{poller="a",code="insecure"} 0
+openstack_exporter_api_errors_total{poller="a",code="network"} 0
+openstack_exporter_api_errors_total{poller="a",code="other"} 0
+openstack_exporter_api_errors_total{poller="a",code="redirect"} 0
+openstack_exporter_api_errors_total{poller="a",code="timeout"} 0
+openstack_exporter_api_errors_total{poller="b",code="401"} 0
+openstack_exporter_api_errors_total{poller="b",code="403"} 0
+openstack_exporter_api_errors_total{poller="b",code="404"} 0
+openstack_exporter_api_errors_total{poller="b",code="429"} 0
+openstack_exporter_api_errors_total{poller="b",code="500"} 0
+openstack_exporter_api_errors_total{poller="b",code="502"} 0
+openstack_exporter_api_errors_total{poller="b",code="503"} 1
+openstack_exporter_api_errors_total{poller="b",code="504"} 0
+openstack_exporter_api_errors_total{poller="b",code="auth"} 0
+openstack_exporter_api_errors_total{poller="b",code="catalog"} 0
+openstack_exporter_api_errors_total{poller="b",code="decode"} 0
+openstack_exporter_api_errors_total{poller="b",code="insecure"} 0
+openstack_exporter_api_errors_total{poller="b",code="network"} 0
+openstack_exporter_api_errors_total{poller="b",code="other"} 0
+openstack_exporter_api_errors_total{poller="b",code="redirect"} 0
+openstack_exporter_api_errors_total{poller="b",code="timeout"} 0

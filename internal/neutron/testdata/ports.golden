@@ -1,0 +1,12 @@
+# HELP openstack_port_info Server port information; device_id is the server id; the value is always 1.
+# TYPE openstack_port_info gauge
+openstack_port_info{id="p1",name="",device_id="s1",network_id="n1"} 1
+openstack_port_info{id="p2",name="eth1",device_id="s2",network_id="n2"} 1
+# HELP openstack_port_up 1 if the port status is ACTIVE, else 0.
+# TYPE openstack_port_up gauge
+openstack_port_up{id="p1"} 1
+openstack_port_up{id="p2"} 0
+# HELP openstack_port_status Current port status; the value is always 1.
+# TYPE openstack_port_status gauge
+openstack_port_status{id="p1",status="ACTIVE"} 1
+openstack_port_status{id="p2",status="DOWN"} 1

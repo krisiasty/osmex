@@ -1,0 +1,97 @@
+# Adapted from krisiasty/videocheck's GoReleaser configuration.
+# https://goreleaser.com
+version: 2
+
+project_name: osmex
+
+builds:
+  - id: darwin
+    main: ./cmd/osmex
+    binary: osmex
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+    goarch:
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }} -X main.commit={{ .FullCommit }} -X main.date={{ .Date }}
+  - id: linux
+    main: ./cmd/osmex
+    binary: osmex
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }} -X main.commit={{ .FullCommit }} -X main.date={{ .Date }}
+
+archives:
+  - id: darwin
+    ids:
+      - darwin
+    formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+      - docs/credentials.md
+  - id: linux
+    ids:
+      - linux
+    formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+      - docs/credentials.md
+      - deploy/systemd/*
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+homebrew_casks:
+  - name: osmex
+    ids:
+      - darwin
+    # The repository is private, so the cask is generated in dist/ but not pushed to the tap.
+    # Remove skip_upload once it is public; the release token then needs write access to the tap.
+    skip_upload: true
+    repository:
+      owner: krisiasty
+      name: homebrew-tap
+    homepage: "https://github.com/krisiasty/osmex"
+    description: "Project-scoped OpenStack exporter for Prometheus"
+    license: "Apache-2.0"
+    binaries:
+      - osmex
+    hooks:
+      post:
+        install_steps: |
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}"]
+    caveats: |
+      Run osmex -help for available options.
+
+release:
+  github:
+    owner: krisiasty
+    name: osmex
+  draft: false

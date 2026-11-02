@@ -1,0 +1,62 @@
+{
+  "servers": [
+    {
+      "id": "a1", "name": "web-01", "status": "ACTIVE", "hostId": "h1",
+      "created": "2026-10-01T10:00:00Z", "updated": "2026-10-07T15:03:39Z",
+      "image": {"id": "img-1", "links": []},
+      "flavor": {"original_name": "m1.small", "vcpus": 1, "ram": 2048, "disk": 20, "ephemeral": 0, "swap": 0, "extra_specs": {}},
+      "OS-EXT-AZ:availability_zone": "nova", "OS-EXT-STS:power_state": 1, "OS-EXT-STS:vm_state": "active", "OS-EXT-STS:task_state": null,
+      "OS-SRV-USG:launched_at": "2026-10-01T10:00:30.000000", "locked": false, "user_id": "u", "key_name": "k", "metadata": {"secret": "x"}, "tags": ["t"]
+    },
+    {
+      "id": "b2", "name": "db-01", "status": "SHUTOFF", "hostId": "h2",
+      "created": "2026-10-01T10:00:00Z", "updated": "2026-10-07T15:00:00Z",
+      "image": {"id": "img-1"},
+      "flavor": {"original_name": "m1.large", "vcpus": 4, "ram": 8192, "disk": 80},
+      "OS-EXT-AZ:availability_zone": "nova", "OS-EXT-STS:power_state": 4, "OS-EXT-STS:vm_state": "stopped", "OS-EXT-STS:task_state": null,
+      "OS-SRV-USG:launched_at": "2026-10-01T10:00:30.000000", "locked": false
+    },
+    {
+      "id": "c3", "name": "broken", "status": "ERROR", "hostId": "",
+      "created": "2026-10-07T11:59:00Z", "updated": "2026-10-07T12:00:00Z",
+      "image": {"id": "img-2"},
+      "flavor": {"original_name": "m1.small", "vcpus": 1, "ram": 2048, "disk": 20},
+      "OS-EXT-AZ:availability_zone": "", "OS-EXT-STS:power_state": 0, "OS-EXT-STS:vm_state": "error", "OS-EXT-STS:task_state": null,
+      "OS-SRV-USG:launched_at": null, "locked": false,
+      "fault": {"code": 500, "created": "2026-10-07T12:00:00Z", "message": "No valid host was found.", "details": "trace"}
+    },
+    {
+      "id": "d4", "name": "bfv", "status": "ACTIVE", "hostId": "h1",
+      "created": "2026-10-02T08:00:00Z", "updated": "2026-10-02T08:01:00Z",
+      "image": "",
+      "flavor": {"original_name": "v1.medium", "vcpus": 2, "ram": 4096, "disk": 0},
+      "OS-EXT-AZ:availability_zone": null, "OS-EXT-STS:power_state": 1, "OS-EXT-STS:vm_state": "active", "OS-EXT-STS:task_state": null,
+      "OS-SRV-USG:launched_at": null, "locked": false
+    },
+    {
+      "id": "e5", "name": "web \"1\"\nb\\", "status": "ACTIVE", "hostId": "h3",
+      "created": "2026-10-02T08:00:00Z", "updated": "2026-10-02T08:01:00Z",
+      "image": {"id": "img-1"},
+      "flavor": {"original_name": "m1.small", "vcpus": 1, "ram": 2048, "disk": 20},
+      "OS-EXT-AZ:availability_zone": "nova", "OS-EXT-STS:power_state": 1, "OS-EXT-STS:vm_state": "active", "OS-EXT-STS:task_state": null,
+      "OS-SRV-USG:launched_at": "2026-10-02T08:00:40.000000", "locked": false
+    },
+    {
+      "id": "f6", "name": "rebooting", "status": "REBOOT", "hostId": "h3",
+      "created": "2026-10-02T08:00:00Z", "updated": "2026-10-07T15:10:00Z",
+      "image": {"id": "img-1"},
+      "flavor": {"original_name": "m1.small", "vcpus": 1, "ram": 2048, "disk": 20},
+      "OS-EXT-AZ:availability_zone": "nova", "OS-EXT-STS:power_state": 1, "OS-EXT-STS:vm_state": "active", "OS-EXT-STS:task_state": "rebooting",
+      "OS-SRV-USG:launched_at": "2026-10-02T08:00:40.000000", "locked": false
+    },
+    {
+      "id": "g7", "name": "locked", "status": "ACTIVE", "hostId": "h2",
+      "created": "2026-10-02T08:00:00Z", "updated": "2026-10-02T08:01:00Z",
+      "image": {"id": "img-1"},
+      "flavor": {"original_name": "m1.small", "vcpus": 1, "ram": 2048, "disk": 20},
+      "OS-EXT-AZ:availability_zone": "nova", "OS-EXT-STS:power_state": 1, "OS-EXT-STS:vm_state": "active", "OS-EXT-STS:task_state": null,
+      "OS-SRV-USG:launched_at": "2026-10-02T08:00:40.000000", "locked": true
+    },
+    {"id": "x9", "status": "UNKNOWN", "created": "2026-10-02T08:00:00Z", "tenant_id": "p", "links": []}
+  ]
+}

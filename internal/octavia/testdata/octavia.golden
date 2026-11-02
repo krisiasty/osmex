@@ -1,0 +1,66 @@
+# HELP openstack_lb_info Load balancer information; the value is always 1.
+# TYPE openstack_lb_info gauge
+openstack_lb_info{id="lb1",name="web",provider="amphora",availability_zone="az1"} 1
+openstack_lb_info{id="lb2",name="api",provider="ovn",availability_zone=""} 1
+openstack_lb_info{id="lb3",name="broken",provider="amphora",availability_zone="az1"} 1
+# HELP openstack_lb_up 1 if the load balancer operating status is ONLINE or NO_MONITOR, else 0.
+# TYPE openstack_lb_up gauge
+openstack_lb_up{id="lb1"} 1
+openstack_lb_up{id="lb2"} 0
+openstack_lb_up{id="lb3"} 0
+# HELP openstack_lb_operating_status Current load balancer operating status; the value is always 1.
+# TYPE openstack_lb_operating_status gauge
+openstack_lb_operating_status{id="lb1",operating_status="ONLINE"} 1
+openstack_lb_operating_status{id="lb2",operating_status="DEGRADED"} 1
+openstack_lb_operating_status{id="lb3",operating_status="OFFLINE"} 1
+# HELP openstack_lb_provisioning_status Current load balancer provisioning status; the value is always 1.
+# TYPE openstack_lb_provisioning_status gauge
+openstack_lb_provisioning_status{id="lb1",provisioning_status="ACTIVE"} 1
+openstack_lb_provisioning_status{id="lb2",provisioning_status="PENDING_UPDATE"} 1
+openstack_lb_provisioning_status{id="lb3",provisioning_status="ERROR"} 1
+# HELP openstack_lb_listener_info Listener information; the value is always 1.
+# TYPE openstack_lb_listener_info gauge
+openstack_lb_listener_info{lb_id="lb1",listener_id="l1",name="http"} 1
+openstack_lb_listener_info{lb_id="lb1",listener_id="l2",name="alt"} 1
+openstack_lb_listener_info{lb_id="lb2",listener_id="l3",name="https"} 1
+# HELP openstack_lb_listener_up 1 if the listener operating status is ONLINE, NO_MONITOR or DEGRADED (connection limit reached), else 0.
+# TYPE openstack_lb_listener_up gauge
+openstack_lb_listener_up{lb_id="lb1",listener_id="l1"} 1
+openstack_lb_listener_up{lb_id="lb1",listener_id="l2"} 1
+openstack_lb_listener_up{lb_id="lb2",listener_id="l3"} 1
+# HELP openstack_lb_listener_operating_status Current listener operating status; the value is always 1.
+# TYPE openstack_lb_listener_operating_status gauge
+openstack_lb_listener_operating_status{lb_id="lb1",listener_id="l1",operating_status="ONLINE"} 1
+openstack_lb_listener_operating_status{lb_id="lb1",listener_id="l2",operating_status="ONLINE"} 1
+openstack_lb_listener_operating_status{lb_id="lb2",listener_id="l3",operating_status="DEGRADED"} 1
+# HELP openstack_lb_listener_provisioning_status Current listener provisioning status; the value is always 1.
+# TYPE openstack_lb_listener_provisioning_status gauge
+openstack_lb_listener_provisioning_status{lb_id="lb1",listener_id="l1",provisioning_status="ACTIVE"} 1
+openstack_lb_listener_provisioning_status{lb_id="lb1",listener_id="l2",provisioning_status="ACTIVE"} 1
+openstack_lb_listener_provisioning_status{lb_id="lb2",listener_id="l3",provisioning_status="PENDING_UPDATE"} 1
+# HELP openstack_lb_pool_up 1 if the pool operating status is ONLINE or NO_MONITOR, else 0.
+# TYPE openstack_lb_pool_up gauge
+openstack_lb_pool_up{lb_id="lb1",pool_id="pl1"} 1
+openstack_lb_pool_up{lb_id="lb2",pool_id="pl2"} 0
+# HELP openstack_lb_pool_operating_status Current pool operating status; the value is always 1.
+# TYPE openstack_lb_pool_operating_status gauge
+openstack_lb_pool_operating_status{lb_id="lb1",pool_id="pl1",operating_status="ONLINE"} 1
+openstack_lb_pool_operating_status{lb_id="lb2",pool_id="pl2",operating_status="DEGRADED"} 1
+# HELP openstack_lb_member_info Pool member information; the value is always 1.
+# TYPE openstack_lb_member_info gauge
+openstack_lb_member_info{member_id="m1",pool_id="pl1",name="web-1",address="10.0.0.1",port="80"} 1
+openstack_lb_member_info{member_id="m2",pool_id="pl1",name="web-2",address="10.0.0.2",port="80"} 1
+openstack_lb_member_info{member_id="m3",pool_id="pl2",name="api \"x\"",address="10.0.1.1",port="443"} 1
+openstack_lb_member_info{member_id="m4",pool_id="pl2",name="",address="10.0.1.2",port="443"} 1
+# HELP openstack_lb_member_up 1 if the member operating status is ONLINE or NO_MONITOR, else 0.
+# TYPE openstack_lb_member_up gauge
+openstack_lb_member_up{member_id="m1",pool_id="pl1"} 1
+openstack_lb_member_up{member_id="m2",pool_id="pl1"} 0
+openstack_lb_member_up{member_id="m3",pool_id="pl2"} 1
+openstack_lb_member_up{member_id="m4",pool_id="pl2"} 0
+# HELP openstack_lb_member_operating_status Current pool member operating status; the value is always 1.
+# TYPE openstack_lb_member_operating_status gauge
+openstack_lb_member_operating_status{member_id="m1",pool_id="pl1",operating_status="ONLINE"} 1
+openstack_lb_member_operating_status{member_id="m2",pool_id="pl1",operating_status="ERROR"} 1
+openstack_lb_member_operating_status{member_id="m3",pool_id="pl2",operating_status="NO_MONITOR"} 1
+openstack_lb_member_operating_status{member_id="m4",pool_id="pl2",operating_status="OFFLINE"} 1

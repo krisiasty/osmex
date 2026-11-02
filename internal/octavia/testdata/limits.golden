@@ -1,0 +1,5 @@
+# HELP openstack_lb_quota_limit Load balancer quota limit by resource.
+# TYPE openstack_lb_quota_limit gauge
+openstack_lb_quota_limit{resource="health_monitors"} 20
+openstack_lb_quota_limit{resource="load_balancers"} 10
+openstack_lb_quota_limit{resource="members"} 200

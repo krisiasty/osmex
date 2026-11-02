@@ -1,0 +1,120 @@
+# HELP openstack_volume_info Volume information; the value is always 1.
+# TYPE openstack_volume_info gauge
+openstack_volume_info{id="v1",name="data",volume_type="ssd",availability_zone="nova",bootable="false"} 1
+openstack_volume_info{id="v2",name="",volume_type="hdd",availability_zone="nova",bootable="true"} 1
+openstack_volume_info{id="v3",name="bad",volume_type="ssd",availability_zone="nova",bootable="false"} 1
+openstack_volume_info{id="v4",name="growing",volume_type="ssd",availability_zone="nova",bootable="false"} 1
+# HELP openstack_volume_status Current volume status; the value is always 1.
+# TYPE openstack_volume_status gauge
+openstack_volume_status{id="v1",status="in-use"} 1
+openstack_volume_status{id="v2",status="available"} 1
+openstack_volume_status{id="v3",status="error"} 1
+openstack_volume_status{id="v4",status="extending"} 1
+# HELP openstack_volume_ok 0 if the volume is in a failed state, else 1.
+# TYPE openstack_volume_ok gauge
+openstack_volume_ok{id="v1"} 1
+openstack_volume_ok{id="v2"} 1
+openstack_volume_ok{id="v3"} 0
+openstack_volume_ok{id="v4"} 1
+# HELP openstack_volume_transitional 1 while the volume is in a transitional state, else 0.
+# TYPE openstack_volume_transitional gauge
+openstack_volume_transitional{id="v1"} 0
+openstack_volume_transitional{id="v2"} 0
+openstack_volume_transitional{id="v3"} 0
+openstack_volume_transitional{id="v4"} 1
+# HELP openstack_volume_size_bytes Volume size in bytes.
+# TYPE openstack_volume_size_bytes gauge
+openstack_volume_size_bytes{id="v1"} 1.073741824e+11
+openstack_volume_size_bytes{id="v2"} 1.073741824e+10
+openstack_volume_size_bytes{id="v3"} 5.36870912e+09
+openstack_volume_size_bytes{id="v4"} 5.36870912e+10
+# HELP openstack_volume_attachment_info Volume attachment to a server; the value is always 1.
+# TYPE openstack_volume_attachment_info gauge
+openstack_volume_attachment_info{id="v1",server_id="s1",device="/dev/vdb"} 1
+# HELP openstack_volume_snapshot_info Volume snapshot information; the value is always 1.
+# TYPE openstack_volume_snapshot_info gauge
+openstack_volume_snapshot_info{id="sn1",name="nightly-1006",volume_id="v1"} 1
+openstack_volume_snapshot_info{id="sn2",name="nightly-1007",volume_id="v1"} 1
+openstack_volume_snapshot_info{id="sn3",name="",volume_id="v2"} 1
+openstack_volume_snapshot_info{id="sn4",name="before \"upgrade\"",volume_id="vdel"} 1
+# HELP openstack_volume_snapshot_status Current volume snapshot status; the value is always 1.
+# TYPE openstack_volume_snapshot_status gauge
+openstack_volume_snapshot_status{id="sn1",status="available"} 1
+openstack_volume_snapshot_status{id="sn2",status="available"} 1
+openstack_volume_snapshot_status{id="sn3",status="error"} 1
+openstack_volume_snapshot_status{id="sn4",status="available"} 1
+# HELP openstack_volume_snapshots Available snapshots of the volume.
+# TYPE openstack_volume_snapshots gauge
+openstack_volume_snapshots{volume_id="v1"} 2
+openstack_volume_snapshots{volume_id="v2"} 0
+openstack_volume_snapshots{volume_id="v3"} 0
+openstack_volume_snapshots{volume_id="v4"} 0
+openstack_volume_snapshots{volume_id="vdel"} 1
+# HELP openstack_volume_snapshots_failed Snapshots of the volume in an error state.
+# TYPE openstack_volume_snapshots_failed gauge
+openstack_volume_snapshots_failed{volume_id="v1"} 0
+openstack_volume_snapshots_failed{volume_id="v2"} 1
+openstack_volume_snapshots_failed{volume_id="v3"} 0
+openstack_volume_snapshots_failed{volume_id="v4"} 0
+openstack_volume_snapshots_failed{volume_id="vdel"} 0
+# HELP openstack_volume_snapshots_size_bytes Total size of available snapshots of the volume in bytes.
+# TYPE openstack_volume_snapshots_size_bytes gauge
+openstack_volume_snapshots_size_bytes{volume_id="v1"} 2.147483648e+11
+openstack_volume_snapshots_size_bytes{volume_id="v2"} 0
+openstack_volume_snapshots_size_bytes{volume_id="v3"} 0
+openstack_volume_snapshots_size_bytes{volume_id="v4"} 0
+openstack_volume_snapshots_size_bytes{volume_id="vdel"} 2.147483648e+10
+# HELP openstack_volume_last_snapshot_timestamp_seconds Creation time of the newest available snapshot of the volume.
+# TYPE openstack_volume_last_snapshot_timestamp_seconds gauge
+openstack_volume_last_snapshot_timestamp_seconds{volume_id="v1"} 1.7913348e+09
+openstack_volume_last_snapshot_timestamp_seconds{volume_id="vdel"} 1.7908128e+09
+# HELP openstack_volume_backup_info Volume backup information; the value is always 1.
+# TYPE openstack_volume_backup_info gauge
+openstack_volume_backup_info{id="b1",name="weekly-full",volume_id="v1",incremental="false"} 1
+openstack_volume_backup_info{id="b2",name="nightly-1007",volume_id="v1",incremental="true"} 1
+openstack_volume_backup_info{id="b3",name="nightly-1008",volume_id="v1",incremental="true"} 1
+openstack_volume_backup_info{id="b4",name="archive",volume_id="vdel2",incremental="false"} 1
+openstack_volume_backup_info{id="b5",name="nightly-1009",volume_id="v1",incremental="true"} 1
+# HELP openstack_volume_backup_status Current volume backup status; the value is always 1.
+# TYPE openstack_volume_backup_status gauge
+openstack_volume_backup_status{id="b1",status="available"} 1
+openstack_volume_backup_status{id="b2",status="error"} 1
+openstack_volume_backup_status{id="b3",status="creating"} 1
+openstack_volume_backup_status{id="b4",status="available"} 1
+openstack_volume_backup_status{id="b5",status="available"} 1
+# HELP openstack_volume_backups Available backups of the volume.
+# TYPE openstack_volume_backups gauge
+openstack_volume_backups{volume_id="v1"} 2
+openstack_volume_backups{volume_id="v2"} 0
+openstack_volume_backups{volume_id="v3"} 0
+openstack_volume_backups{volume_id="v4"} 0
+openstack_volume_backups{volume_id="vdel2"} 1
+# HELP openstack_volume_backups_failed Backups of the volume in an error state.
+# TYPE openstack_volume_backups_failed gauge
+openstack_volume_backups_failed{volume_id="v1"} 1
+openstack_volume_backups_failed{volume_id="v2"} 0
+openstack_volume_backups_failed{volume_id="v3"} 0
+openstack_volume_backups_failed{volume_id="v4"} 0
+openstack_volume_backups_failed{volume_id="vdel2"} 0
+# HELP openstack_volume_backup_in_progress 1 while a backup of the volume is being created, else 0.
+# TYPE openstack_volume_backup_in_progress gauge
+openstack_volume_backup_in_progress{volume_id="v1"} 1
+openstack_volume_backup_in_progress{volume_id="v2"} 0
+openstack_volume_backup_in_progress{volume_id="v3"} 0
+openstack_volume_backup_in_progress{volume_id="v4"} 0
+openstack_volume_backup_in_progress{volume_id="vdel2"} 0
+# HELP openstack_volume_backups_size_bytes Total size of available backups of the volume in bytes (source volume size).
+# TYPE openstack_volume_backups_size_bytes gauge
+openstack_volume_backups_size_bytes{volume_id="v1"} 2.147483648e+11
+openstack_volume_backups_size_bytes{volume_id="v2"} 0
+openstack_volume_backups_size_bytes{volume_id="v3"} 0
+openstack_volume_backups_size_bytes{volume_id="v4"} 0
+openstack_volume_backups_size_bytes{volume_id="vdel2"} 3.221225472e+10
+# HELP openstack_volume_last_backup_timestamp_seconds Point in time captured by the newest available backup of the volume (data_timestamp: the snapshot's time for a backup taken from a snapshot, otherwise its start).
+# TYPE openstack_volume_last_backup_timestamp_seconds gauge
+openstack_volume_last_backup_timestamp_seconds{volume_id="v1"} 1.7914248e+09
+openstack_volume_last_backup_timestamp_seconds{volume_id="vdel2"} 1.7882208e+09
+# HELP openstack_volume_last_full_backup_timestamp_seconds Point in time captured by the newest available full (not incremental) backup of the volume; restoring an incremental backup needs every backup back to this one.
+# TYPE openstack_volume_last_full_backup_timestamp_seconds gauge
+openstack_volume_last_full_backup_timestamp_seconds{volume_id="v1"} 1.7913276e+09
+openstack_volume_last_full_backup_timestamp_seconds{volume_id="vdel2"} 1.7882208e+09

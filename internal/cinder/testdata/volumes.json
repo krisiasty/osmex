@@ -1,0 +1,7 @@
+{"volumes": [
+  {"id": "v1", "name": "data", "status": "in-use", "size": 100, "volume_type": "ssd", "availability_zone": "nova", "bootable": "false",
+   "attachments": [{"id": "a1", "attachment_id": "a1", "volume_id": "v1", "server_id": "s1", "device": "/dev/vdb", "host_name": null}]},
+  {"id": "v2", "name": null, "status": "available", "size": 10, "volume_type": "hdd", "availability_zone": "nova", "bootable": "true", "attachments": []},
+  {"id": "v3", "name": "bad", "status": "error", "size": 5, "volume_type": "ssd", "availability_zone": "nova", "bootable": "false", "attachments": []},
+  {"id": "v4", "name": "growing", "status": "extending", "size": 50, "volume_type": "ssd", "availability_zone": "nova", "bootable": "false", "attachments": []}
+]}

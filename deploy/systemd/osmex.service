@@ -1,0 +1,38 @@
+[Unit]
+Description=osmex project-scoped OpenStack exporter
+Documentation=https://github.com/krisiasty/osmex
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+# Non-secret OS_* configuration; root-owned, mode 0600.
+EnvironmentFile=/etc/osmex/osmex.env
+# The application credential secret, encrypted with systemd-creds; see docs/credentials.md.
+# osmex reads it from $CREDENTIALS_DIRECTORY and refuses to start if osmex.env also sets a secret.
+LoadCredentialEncrypted=application-credential-secret:/etc/osmex/application-credential-secret.cred
+# Enable the services this customer uses, or -all; -no-<service> excludes one, for example -all -no-barbican.
+# Listens on 127.0.0.1:9180 by default.
+ExecStart=/usr/local/bin/osmex -nova -cinder -neutron
+Restart=on-failure
+RestartSec=10s
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+CapabilityBoundingSet=
+SystemCallFilter=@system-service
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,120 @@
+version: "3"
+
+vars:
+  INSTALL_DIR: /usr/local/bin
+  HOST_OS: '{{OS}}'
+  HOST_ARCH: '{{ARCH}}'
+  NATIVE_BINARY: build/{{.HOST_OS}}_{{.HOST_ARCH}}/osmex
+
+tasks:
+  default:
+    desc: List available tasks
+    silent: true
+    cmds:
+      - task --list
+
+  build:
+    desc: Build the native binary in build/ with release flags
+    env:
+      GOOS: '{{.HOST_OS}}'
+      GOARCH: '{{.HOST_ARCH}}'
+    method: timestamp
+    sources:
+      - cmd/**/*.go
+      - internal/**/*.go
+      - exclude: '**/*_test.go'
+      - go.mod
+      - go.sum
+      - .goreleaser.yaml
+      - Taskfile.yml
+      - .git/HEAD
+      - .git/refs/**/*
+      - .git/packed-refs
+    generates:
+      - '{{.NATIVE_BINARY}}'
+    cmds:
+      # Override only the output directory; keep release flags and version stamping in one configuration.
+      - |
+        mkdir -p build '{{dir .NATIVE_BINARY}}'
+        { printf 'dist: build/dist\n'; cat .goreleaser.yaml; } > build/goreleaser.yaml
+      - goreleaser build --config build/goreleaser.yaml --snapshot --clean --single-target --id '{{.HOST_OS}}' --output '{{.NATIVE_BINARY}}'
+
+  run:
+    desc: Run the installed binary with -all, or with the flags given after --
+    vars:
+      ARGS: '{{default "-all" .CLI_ARGS}}'
+    cmds:
+      - |
+        if [ ! -x "{{.INSTALL_DIR}}/osmex" ]; then
+          echo "No executable osmex in {{.INSTALL_DIR}}; run task install first" >&2
+          exit 1
+        fi
+        exec "{{.INSTALL_DIR}}/osmex" {{.ARGS}}
+
+  test:
+    desc: Run all tests (pass Go test flags after --)
+    vars:
+      TEST_FLAGS: '{{default .CLI_ARGS .TEST_FLAGS}}'
+    cmds:
+      - go test {{.TEST_FLAGS}} ./...
+
+  check:
+    desc: Check modules, release configuration, lint, vulnerabilities, and race tests
+    cmds:
+      - go mod tidy -diff
+      - go mod verify
+      - goreleaser check
+      - task: lint
+        vars:
+          CLI_ARGS: ''
+      - govulncheck ./...
+      - task: test
+        vars:
+          TEST_FLAGS: -race
+
+  lint:
+    desc: Run golangci-lint and gohawk (pass golangci-lint flags after --)
+    cmds:
+      - golangci-lint run {{.CLI_ARGS}}
+      - gohawk ./...
+
+  release:
+    desc: Check, build all platforms, and publish the tagged HEAD as a GitHub release
+    vars:
+      TAG:
+        sh: git describe --tags --exact-match HEAD 2>/dev/null || true
+    preconditions:
+      - sh: '[ -n "{{.TAG}}" ]'
+        msg: HEAD is not a tagged commit; use "task build" for a local build
+      - sh: '[ -z "$(git status --porcelain)" ]'
+        msg: The working tree has uncommitted or untracked changes
+      - sh: '[ "$(git ls-remote --tags origin "refs/tags/{{.TAG}}" | cut -f1)" = "$(git rev-parse "refs/tags/{{.TAG}}")" ]'
+        msg: "Tag {{.TAG}} is missing on origin or differs there; push it first with: git push origin {{.TAG}}"
+      - sh: '[ -n "$GITHUB_TOKEN" ] || gh auth token >/dev/null 2>&1'
+        msg: No GitHub token; set GITHUB_TOKEN or log in with "gh auth login"
+    cmds:
+      - task: check
+      - task: publish
+        vars:
+          TAG: '{{.TAG}}'
+
+  publish:
+    internal: true
+    # Confirm only after release preconditions and the complete check have passed.
+    prompt: Publish {{.TAG}} as a GitHub release?
+    cmds:
+      # Resolve the gh token inside the command so Task never prints it, even with -v.
+      - GITHUB_TOKEN="${GITHUB_TOKEN:-$(gh auth token)}" goreleaser release --clean
+
+  install:
+    desc: Build the native binary if needed, then install it in /usr/local/bin
+    silent: true
+    cmds:
+      - task: build
+      - |
+        if [ -w "{{.INSTALL_DIR}}" ]; then
+          install -m 0755 "{{.NATIVE_BINARY}}" "{{.INSTALL_DIR}}/osmex"
+        else
+          sudo -p "Elevated privileges are needed to install the binary in {{.INSTALL_DIR}}.
+        [sudo] password for %u: " install -m 0755 "{{.NATIVE_BINARY}}" "{{.INSTALL_DIR}}/osmex"
+        fi

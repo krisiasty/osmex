@@ -1,0 +1,10 @@
+# HELP openstack_floating_ip_info Floating IP information; the value is always 1.
+# TYPE openstack_floating_ip_info gauge
+openstack_floating_ip_info{id="f1",floating_ip_address="203.0.113.10",port_id="p1"} 1
+openstack_floating_ip_info{id="f2",floating_ip_address="203.0.113.11",port_id="p2"} 1
+openstack_floating_ip_info{id="f3",floating_ip_address="203.0.113.12",port_id=""} 1
+# HELP openstack_floating_ip_status Current floating IP status; the value is always 1.
+# TYPE openstack_floating_ip_status gauge
+openstack_floating_ip_status{id="f1",status="ACTIVE"} 1
+openstack_floating_ip_status{id="f2",status="DOWN"} 1
+openstack_floating_ip_status{id="f3",status="DOWN"} 1

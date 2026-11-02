@@ -1,0 +1,36 @@
+{
+  "snapshots": [
+    {
+      "id": "sn1",
+      "volume_id": "v1",
+      "status": "available",
+      "size": 100,
+      "created_at": "2026-10-06T01:00:00.000000",
+      "name": "nightly-1006"
+    },
+    {
+      "id": "sn2",
+      "volume_id": "v1",
+      "status": "available",
+      "size": 100,
+      "created_at": "2026-10-07T01:00:00.000000",
+      "name": "nightly-1007"
+    },
+    {
+      "id": "sn3",
+      "volume_id": "v2",
+      "status": "error",
+      "size": 10,
+      "created_at": "2026-10-07T01:00:00.000000",
+      "name": null
+    },
+    {
+      "id": "sn4",
+      "volume_id": "vdel",
+      "status": "available",
+      "size": 20,
+      "created_at": "2026-10-01T00:00:00.000000",
+      "name": "before \"upgrade\""
+    }
+  ]
+}

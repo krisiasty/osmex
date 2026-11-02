@@ -1,0 +1,26 @@
+version: "2"
+
+linters:
+  enable:
+    - gosec
+    - errcheck
+    - unused
+    - staticcheck
+    - govet
+    - noctx
+    - ineffassign
+    - contextcheck
+    - nilnesserr
+    - errorlint
+    - nolintlint
+    - usetesting
+    - exhaustive
+    - modernize
+    - predeclared
+  settings:
+    nolintlint:
+      require-specific: true
+      require-explanation: true
+    usetesting:
+      context-background: true
+      context-todo: true
