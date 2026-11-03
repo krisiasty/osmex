@@ -57,6 +57,38 @@ archives:
 checksum:
   name_template: checksums.txt
 
+kos:
+  - id: osmex
+    build: linux
+    repositories:
+      - ghcr.io/krisiasty/osmex
+    bare: true
+    # Pinned by digest; nothing updates it automatically. Refresh before a release with:
+    #   crane digest gcr.io/distroless/static-debian13:nonroot
+    base_image: gcr.io/distroless/static-debian13:nonroot@sha256:25ac8f0c3b2334a9eb05452266bd4697864a8c8ef0ef71e5e6480d7f92868329
+    user: "65532:65532"
+    # The commit time, so the same commit always produces the same image digest.
+    creation_time: "{{ .CommitTimestamp }}"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    sbom: spdx
+    # Ko normally loads snapshots into Docker; keep local archive builds daemonless.
+    disable: "{{ .IsSnapshot }}"
+    tags:
+      - "v{{ .Version }}"
+      # Prereleases and snapshots must not replace stable release aliases.
+      - '{{ if and (not .IsSnapshot) (not .Prerelease) }}v{{ .Major }}.{{ .Minor }}{{ end }}'
+      - '{{ if and (not .IsSnapshot) (not .Prerelease) }}latest{{ end }}'
+    labels:
+      org.opencontainers.image.title: "{{ .ProjectName }}"
+      org.opencontainers.image.description: Project-scoped OpenStack exporter for Prometheus
+      org.opencontainers.image.url: https://github.com/krisiasty/osmex
+      org.opencontainers.image.source: https://github.com/krisiasty/osmex
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.licenses: Apache-2.0
+
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
 
@@ -72,8 +104,8 @@ homebrew_casks:
   - name: osmex
     ids:
       - darwin
-    # The repository is private, so the cask is generated in dist/ but not pushed to the tap.
-    # Remove skip_upload once it is public; the release token then needs write access to the tap.
+    # Generate the cask locally until publishing to the tap is configured.
+    # Removing skip_upload also requires a release token with write access to the tap.
     skip_upload: true
     repository:
       owner: krisiasty
@@ -95,3 +127,12 @@ release:
     owner: krisiasty
     name: osmex
   draft: false
+  prerelease: auto
+  footer: |
+    ## Container image
+
+    ```text
+    ghcr.io/krisiasty/osmex:v{{ .Version }}
+    ```
+
+    The image supports Linux amd64 and arm64. See the README for TLS, authentication and secret-file mounts.

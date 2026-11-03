@@ -79,7 +79,7 @@ tasks:
       - gohawk ./...
 
   release:
-    desc: Check, build all platforms, and publish the tagged HEAD as a GitHub release
+    desc: Check and publish the tagged HEAD as GitHub archives and multi-platform container images
     vars:
       TAG:
         sh: git describe --tags --exact-match HEAD 2>/dev/null || true
@@ -101,7 +101,7 @@ tasks:
   publish:
     internal: true
     # Confirm only after release preconditions and the complete check have passed.
-    prompt: Publish {{.TAG}} as a GitHub release?
+    prompt: Publish {{.TAG}} archives to GitHub and container images to GHCR?
     cmds:
       # Resolve the gh token inside the command so Task never prints it, even with -v.
       - GITHUB_TOKEN="${GITHUB_TOKEN:-$(gh auth token)}" goreleaser release --clean

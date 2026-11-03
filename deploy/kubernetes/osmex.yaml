@@ -1,0 +1,112 @@
+# Apply in the same namespace as the Secrets. Set the image tag and OpenStack settings first.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: osmex
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: osmex
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: osmex
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: osmex
+          image: ghcr.io/krisiasty/osmex:v1.2.0
+          args:
+            - -nova
+            - -listen-address=:9180
+            - -listen-tls-cert-file=/run/secrets/osmex/tls/tls.crt
+            - -listen-tls-key-file=/run/secrets/osmex/tls/tls.key
+            - -listen-auth-username=prometheus
+            - -listen-auth-password-file=/run/secrets/osmex/scrape/password
+            - -probe-address=:9181
+          env:
+            - name: OS_AUTH_URL
+              value: https://keystone.example.com:5000/v3
+            - name: OS_REGION_NAME
+              value: RegionOne
+            - name: OS_INTERFACE
+              value: public
+            # The id is not a secret; keep it with its secret so rotations have one source.
+            - name: OS_APPLICATION_CREDENTIAL_ID
+              valueFrom:
+                secretKeyRef:
+                  name: osmex-openstack
+                  key: application-credential-id
+            - name: OS_APPLICATION_CREDENTIAL_SECRET_FILE
+              value: /run/secrets/osmex/openstack/application-credential-secret
+          ports:
+            - name: metrics
+              containerPort: 9180
+            - name: probes
+              containerPort: 9181
+          # No startupProbe: /livez passes from the start, and gating liveness on /readyz would restart a pod whose first
+          # poll is merely slow.
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: probes
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: probes
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: openstack
+              mountPath: /run/secrets/osmex/openstack
+              readOnly: true
+            - name: scrape
+              mountPath: /run/secrets/osmex/scrape
+              readOnly: true
+            - name: tls
+              mountPath: /run/secrets/osmex/tls
+              readOnly: true
+      volumes:
+        - name: openstack
+          secret:
+            secretName: osmex-openstack
+            defaultMode: 0440
+            items:
+              - key: application-credential-secret
+                path: application-credential-secret
+        - name: scrape
+          secret:
+            secretName: osmex-scrape
+            defaultMode: 0440
+            items:
+              - key: password
+                path: password
+        - name: tls
+          secret:
+            secretName: osmex-tls
+            defaultMode: 0440
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: osmex
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: osmex
+  ports:
+    - name: https-metrics
+      port: 9180
+      targetPort: metrics
