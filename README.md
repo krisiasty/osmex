@@ -492,7 +492,38 @@ panels so each code shows its name:
 6. Point vmagent at `http://127.0.0.1:9180/metrics` with a 60 s scrape interval. To scrape over the network, see
    [Securing the endpoint](#securing-the-endpoint).
 
+## Kubernetes deployment
+
+Releases publish `ghcr.io/krisiasty/osmex` for Linux amd64 and arm64. A version tag such as `v1.2.0` selects both platforms;
+Kubernetes pulls the matching architecture. Stable releases also update the minor tag (`v1.2`) and `latest`; prereleases only publish their full version tag.
+The image uses Debian 13 distroless, pinned by digest, and runs as UID/GID `65532:65532`. It contains the binary and the base image, with no shell.
+
+The [Kubernetes example](deploy/kubernetes/osmex.yaml) serves HTTPS metrics with basic authentication and mounts the OpenStack credential secret,
+scrape password and TLS private key from Kubernetes Secrets as read-only files. Optional
+[ExternalSecret mappings](deploy/kubernetes/external-secrets.yaml) synchronize them from an existing external secret store; the image and workload YAML contain no secret values.
+
+See [docs/kubernetes.md](docs/kubernetes.md) for permissions, secret-store integration, scraping and rotation. Mounted scrape passwords and server TLS pairs reload
+while osmex runs; rotating the OpenStack application credential requires a pod rollout. The systemd deployment continues to use
+[systemd-creds](docs/credentials.md#supply-the-secret-through-systemd-creds).
+
 ## Development
+
+### Tools
+
+| Tool | Needed for | Required | Repository |
+| --- | --- | --- | --- |
+| Go 1.27.3 or newer | building and testing | yes | [go.dev/dl](https://go.dev/dl/) |
+| Task | every `task` command | yes | [go-task/task](https://github.com/go-task/task) |
+| GoReleaser v2 | `task build`, `task check` and `task release`; its built-in [ko](https://github.com/ko-build/ko) integration builds the container images, so ko needs no separate install | yes | [goreleaser/goreleaser](https://github.com/goreleaser/goreleaser) |
+| golangci-lint v2 | `task lint` and `task check` | yes | [golangci/golangci-lint](https://github.com/golangci/golangci-lint) |
+| gohawk | `task lint` and `task check` | yes | [kojah/gohawk](https://github.com/kojah/gohawk) |
+| govulncheck | `task check` | yes | [golang/vuln](https://github.com/golang/vuln) |
+| GitHub CLI | the token for `task release` when `GITHUB_TOKEN` is not set | no | [cli/cli](https://github.com/cli/cli) |
+| crane | `task base-image` and `task release`, to check the pinned base image digest; also handy for inspecting published images | for releases | [google/go-containerregistry](https://github.com/google/go-containerregistry/tree/main/cmd/crane) |
+
+Docker is not needed for any of them.
+
+### Tasks
 
 The [Taskfile](Taskfile.yml) provides shortcuts using [go-task](https://taskfile.dev/). Run `task` to list them:
 
@@ -507,7 +538,8 @@ task test -- -race     # run tests with the race detector
 task test -- -run TestName -count=1 # run matching tests without cached results
 task lint              # run golangci-lint (including govet) and gohawk
 task lint -- -v        # pass verbose output to golangci-lint, then run gohawk
-task release           # check, build all platforms, and publish a tagged GitHub release
+task base-image        # check that the pinned container base image is still current
+task release           # check and publish tagged GitHub archives and GHCR container images
 ```
 
 `task check` runs `go mod tidy -diff`, `go mod verify`, `goreleaser check`, `task lint`, `govulncheck ./...`, and `task test` with `-race`
@@ -526,7 +558,9 @@ Override the install directory with `task install INSTALL_DIR=/path/to/bin`. `ta
 use the same `INSTALL_DIR` override when running from a custom location. It defaults to `-all`, or forwards the flags after `--` instead.
 
 `task release` requires HEAD to be exactly on a tag and the working tree to be clean, including untracked files. It checks that the tag is on `origin`
-at the same commit and that a GitHub token is available, then runs `task check` before asking for confirmation and publishing all configured platforms.
+at the same commit and that a GitHub token is available. It then runs `task base-image` and `task check` before asking for confirmation and publishing
+archives to GitHub and multi-platform images to GHCR. The token also needs permission to publish packages, as described below.
+Run `task base-image` before tagging as well: a stale base image needs a commit that updates the pin, and the tag has to point to that commit.
 Without a terminal the prompt cancels the release unless `task -y` is used. Release never installs a binary or falls back to a snapshot.
 
 ### Release builds
@@ -538,16 +572,30 @@ It builds binaries for macOS on arm64 and Linux on amd64 and arm64, and embeds t
 commit that Go records when building from a checkout, and show `unknown` for anything missing.
 Releases include tar.gz archives with the README, the license, the credentials guide, and SHA-256 checksums.
 Linux archives also contain the systemd unit and environment example from `deploy/systemd/`.
+GoReleaser's built-in [Ko integration](https://goreleaser.com/customization/package/ko/) builds and publishes the Linux images directly to GHCR.
+It inherits the existing `linux` build's main package, static-build environment and version flags. It rebuilds the binary using those settings;
+the Go build cache avoids recompiling unchanged packages. Docker, Buildx and a separate `ko` executable are not required.
+The base image is pinned by digest in `.goreleaser.yaml` and nothing updates it automatically. `task base-image` compares the pin with the digest its tag
+points to now, using crane, and fails with the replacement value when they differ; `task release` runs it first.
 
-Validate the configuration and build a local snapshot without publishing:
+Validate the configuration and build a local snapshot of the release archives without publishing:
 
 ```sh
 goreleaser check
 goreleaser release --snapshot --clean
 ```
 
-Artifacts are written to `dist/`, which is ignored by Git. A tagged release uses `goreleaser release --clean` with a GitHub token for `krisiasty/osmex`.
-`task release` uses `GITHUB_TOKEN` when it is set and otherwise the GitHub CLI login (`gh auth token`), which needs the `repo` scope.
-The macOS Homebrew cask is generated in `dist/` but not pushed to `krisiasty/homebrew-tap` while this repository is private:
-Homebrew would need an authenticated download strategy for private release assets. Once the repository is public, remove `skip_upload` from the cask in `.goreleaser.yaml`;
-the release token then also needs write access to the tap.
+Container image publishing is disabled in snapshot mode. Images are built and pushed during a normal tagged release through GoReleaser's Ko integration.
+`task build` continues to build only the native binary.
+Artifacts are written to `dist/`, which is ignored by Git. Snapshot and release commands with `--clean` replace that directory.
+
+### Publishing container images from macOS
+
+A tagged release uses `goreleaser release --clean`, or `task release`, with a GitHub token for `krisiasty/osmex`.
+`task release` uses `GITHUB_TOKEN` when set and otherwise the GitHub CLI login (`gh auth token`). Ko also authenticates to GHCR with that token;
+no separate registry login or Docker installation is required. Supply a token from your secret store or existing CLI login with both permission to
+create releases and `write:packages` permission to publish the container package. A classic personal access token supports these permissions.
+After the first publish, set the GHCR package's visibility to public to allow anonymous pulls.
+
+The macOS Homebrew cask is generated in `dist/`; tap publishing remains disabled until its release credentials are configured.
+Removing `skip_upload` from the cask in `.goreleaser.yaml` also requires a token with write access to `krisiasty/homebrew-tap`.
