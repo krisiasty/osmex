@@ -135,24 +135,27 @@ investigation rather than in normal operation.
 ### Securing the endpoint
 
 osmex serves plain HTTP without authentication by default, on the loopback address. Its metrics name the project's servers, volumes, addresses and
-load balancers, so when the scrape crosses a network you don't control, turn on TLS, authentication, or both. They are independent:
+load balancers, so when the scrape crosses a network you don't control, TLS is required: osmex's own, or a TLS-terminating proxy in front of osmex
+listening only where that proxy can reach it. Authentication comes on top of TLS, never instead of it. Basic authentication over plain HTTP sends
+the password, readable, with every scrape, however securely it is stored, so use it without TLS only on a network you trust, such as loopback behind
+a proxy; osmex logs a warning when it is configured that way.
 
 ```sh
 # HTTPS
 osmex -nova -listen-address=:9180 -listen-tls-cert-file=/etc/osmex/tls.crt -listen-tls-key-file=/etc/osmex/tls.key
 
-# mutual TLS: the scraper must present a certificate signed by ca.crt, and is refused during the handshake otherwise
+# HTTPS with mutual TLS: the scraper must present a certificate signed by ca.crt, and is refused during the handshake otherwise
 osmex -nova -listen-address=:9180 -listen-tls-cert-file=/etc/osmex/tls.crt -listen-tls-key-file=/etc/osmex/tls.key \
   -listen-tls-client-ca-file=/etc/osmex/ca.crt
 
-# basic authentication, best over TLS
+# HTTPS with basic authentication
 osmex -nova -listen-address=:9180 -listen-tls-cert-file=/etc/osmex/tls.crt -listen-tls-key-file=/etc/osmex/tls.key \
   -listen-auth-username=prometheus -listen-auth-password-file=/etc/osmex/scrape-password
 ```
 
 - Every file is read at startup, so a wrong path or an empty password file stops osmex before it serves. A private key or password file readable
   beyond its owner logs a warning; group-readable is fine when the group is one osmex runs in, as with a Kubernetes secret mounted under the pod's
-  `fsGroup`. Basic authentication without TLS logs a warning, because the password then crosses the network on every scrape.
+  `fsGroup`.
 - TLS 1.2 is the minimum. The certificate and key are checked for changes at most every 30 seconds when a connection arrives, and reloaded when
   they change, so a renewal by cert-manager or another tool needs no restart. A pair that fails to load, such as a half-written one, keeps the
   previous certificate in use.
