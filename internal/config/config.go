@@ -31,6 +31,12 @@ type OSEnv struct {
 // Config is the complete exporter configuration.
 type Config struct {
 	ListenAddress           string
+	ProbeAddress            string // "" = the probes are served on ListenAddress only
+	ListenTLSCertFile       string
+	ListenTLSKeyFile        string
+	ListenTLSClientCAFile   string
+	ListenAuthUsername      string
+	ListenAuthPasswordFile  string
 	Services                []string // explicitly enabled services, in ServiceNames order, without excluded ones
 	All                     bool
 	Excluded                []string // services excluded with -no-<service>, in ServiceNames order; they win over -<service> and -all
@@ -58,6 +64,12 @@ type Config struct {
 	OS                      OSEnv
 }
 
+// ListenTLS reports whether /metrics is served over HTTPS.
+func (c Config) ListenTLS() bool { return c.ListenTLSCertFile != "" }
+
+// ListenAuth reports whether /metrics requires basic authentication.
+func (c Config) ListenAuth() bool { return c.ListenAuthUsername != "" }
+
 // AnyService reports whether at least one service is enabled.
 func (c Config) AnyService() bool {
 	return len(c.Services) > 0 || c.All && len(c.Excluded) < len(ServiceNames)
@@ -83,7 +95,13 @@ func Parse(args []string, getenv func(string) string) (Config, error) {
 		excluded[m] = fs.Bool("no-"+m, false, "exclude the "+m+" service, even with -all or -"+m)
 	}
 	fs.BoolVar(&c.All, "all", false, "enable every service available in the catalog")
-	fs.StringVar(&c.ListenAddress, "listen-address", "127.0.0.1:9180", "address to serve /metrics on")
+	fs.StringVar(&c.ListenAddress, "listen-address", "127.0.0.1:9180", "address to serve /metrics, /livez and /readyz on")
+	fs.StringVar(&c.ProbeAddress, "probe-address", "", "also serve /livez and /readyz, and nothing else, on this address over plain HTTP without authentication")
+	fs.StringVar(&c.ListenTLSCertFile, "listen-tls-cert-file", "", "serve HTTPS with this PEM certificate; re-read when it changes")
+	fs.StringVar(&c.ListenTLSKeyFile, "listen-tls-key-file", "", "PEM private key for -listen-tls-cert-file")
+	fs.StringVar(&c.ListenTLSClientCAFile, "listen-tls-client-ca-file", "", "require a client certificate signed by this PEM bundle")
+	fs.StringVar(&c.ListenAuthUsername, "listen-auth-username", "", "require basic authentication with this username, except for /livez and /readyz")
+	fs.StringVar(&c.ListenAuthPasswordFile, "listen-auth-password-file", "", "file holding the basic authentication password; re-read after a rejection")
 	fs.DurationVar(&c.NovaServersInterval, "nova-servers-interval", 60*time.Second, "nova-servers poll interval")
 	fs.DurationVar(&c.NovaLimitsInterval, "nova-limits-interval", 300*time.Second, "nova-limits poll interval")
 	fs.DurationVar(&c.CinderInterval, "cinder-interval", 60*time.Second, "cinder poll interval (volumes)")
@@ -164,6 +182,9 @@ func Parse(args []string, getenv func(string) string) (Config, error) {
 	if c.OctaviaThresholds, err = parseThresholds(*thresholds); err != nil {
 		return c, err
 	}
+	if err := c.validateListen(); err != nil {
+		return c, err
+	}
 	if c.MaxConcurrent < 1 {
 		return c, errors.New("-max-concurrent-requests must be at least 1")
 	}
@@ -214,6 +235,22 @@ func Parse(args []string, getenv func(string) string) (Config, error) {
 		}
 	}
 	return c, nil
+}
+
+// validateListen checks that the listener flags fit together. It reads no files: they are checked when the listener
+// is set up.
+func (c Config) validateListen() error {
+	switch {
+	case c.ProbeAddress != "" && c.ProbeAddress == c.ListenAddress:
+		return errors.New("-probe-address must differ from -listen-address")
+	case (c.ListenTLSCertFile == "") != (c.ListenTLSKeyFile == ""):
+		return errors.New("set both -listen-tls-cert-file and -listen-tls-key-file, or neither")
+	case c.ListenTLSClientCAFile != "" && !c.ListenTLS():
+		return errors.New("-listen-tls-client-ca-file requires -listen-tls-cert-file and -listen-tls-key-file")
+	case (c.ListenAuthUsername == "") != (c.ListenAuthPasswordFile == ""):
+		return errors.New("set both -listen-auth-username and -listen-auth-password-file, or neither")
+	}
+	return nil
 }
 
 func parseThresholds(s string) ([2]int, error) {

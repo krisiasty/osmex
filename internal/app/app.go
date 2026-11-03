@@ -3,7 +3,9 @@ package app
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -20,12 +22,14 @@ import (
 	"github.com/krisiasty/osmex/internal/config"
 	"github.com/krisiasty/osmex/internal/expo"
 	"github.com/krisiasty/osmex/internal/keystone"
+	"github.com/krisiasty/osmex/internal/listen"
 	"github.com/krisiasty/osmex/internal/neutron"
 	"github.com/krisiasty/osmex/internal/nova"
 	"github.com/krisiasty/osmex/internal/octavia"
 	"github.com/krisiasty/osmex/internal/osclient"
 	"github.com/krisiasty/osmex/internal/poller"
 	"github.com/krisiasty/osmex/internal/runtimestats"
+	"github.com/krisiasty/osmex/internal/secret"
 	"github.com/krisiasty/osmex/internal/server"
 )
 
@@ -66,12 +70,50 @@ var Services = []Service{
 
 // Options carries process-level settings for Run.
 type Options struct {
-	Version  string
-	Logger   *slog.Logger
-	Listener net.Listener // nil → listen on cfg.ListenAddress
+	Version       string
+	Logger        *slog.Logger
+	Listener      net.Listener // nil → listen on cfg.ListenAddress
+	ProbeListener net.Listener // nil → listen on cfg.ProbeAddress, if set
 }
 
 const shutdownTimeout = 10 * time.Second
+
+// newServer returns an HTTP server with timeouts, so a slow client cannot hold a connection open.
+func newServer(h http.Handler, tlsCfg *tls.Config) *http.Server {
+	return &http.Server{Handler: h, TLSConfig: tlsCfg, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 30 * time.Second}
+}
+
+// secureListener returns the TLS configuration for the main listener, nil without TLS, and a function that adds
+// basic authentication to a handler when it is configured. It reads every file now, so a wrong path fails at startup
+// rather than at the first scrape.
+func secureListener(cfg config.Config, log *slog.Logger) (*tls.Config, func(http.Handler) http.Handler, error) {
+	tlsCfg, err := listen.TLSConfig(listen.Options{CertFile: cfg.ListenTLSCertFile, KeyFile: cfg.ListenTLSKeyFile, ClientCAFile: cfg.ListenTLSClientCAFile})
+	if err != nil {
+		return nil, nil, fmt.Errorf("listener TLS: %w", err)
+	}
+	protect := func(h http.Handler) http.Handler { return h }
+	if cfg.ListenAuth() {
+		password, err := secret.NewFileCredential(cfg.ListenAuthPasswordFile)
+		if err != nil {
+			return nil, nil, fmt.Errorf("-listen-auth-password-file: %w", err)
+		}
+		protect = func(h http.Handler) http.Handler {
+			return listen.BasicAuth(h, cfg.ListenAuthUsername, password, log, server.ProbePaths...)
+		}
+		if !cfg.ListenTLS() {
+			log.Warn("basic authentication without TLS sends the password in clear on every scrape")
+		}
+	}
+	for flag, path := range map[string]string{"-listen-tls-key-file": cfg.ListenTLSKeyFile, "-listen-auth-password-file": cfg.ListenAuthPasswordFile} {
+		if path == "" {
+			continue
+		}
+		if info, err := os.Stat(path); err == nil && secret.LooseMode(info) {
+			log.Warn("secret file readable beyond its owner", "flag", flag, "path", path, "mode", fmt.Sprintf("%#o", info.Mode().Perm()))
+		}
+	}
+	return tlsCfg, protect, nil
+}
 
 // selectServices picks the services -all enables: those with an endpoint for the configured region and
 // interface, found the same way the client finds it. A service that has none is skipped. A service whose region is
@@ -125,9 +167,36 @@ func Run(ctx context.Context, cfg config.Config, o Options) error {
 	if cfg.Debug {
 		httpClient.Transport = osclient.NewLoggingTransport(httpClient.Transport, log)
 	}
+
+	var pollers atomic.Pointer[[]*poller.Poller]
+	pollers.Store(&[]*poller.Poller{})
+	// settled is set once the pollers are started, or under -all once the first authentication has failed: readiness
+	// must not wait for a Keystone that may never answer, or auth_up = 0 would be hidden from a scraper that skips
+	// endpoints that are not ready.
+	var settled atomic.Bool
+	health := server.NewHealth(func() []*poller.Poller { return *pollers.Load() }, settled.Load, nil)
+	srvOpts := server.Options{
+		Pollers:   func() []*poller.Poller { return *pollers.Load() },
+		Version:   o.Version,
+		GoVersion: runtime.Version(),
+		Runtime:   func(p *expo.Page) { runtimestats.Render(p, os.DirFS("/")) },
+		Health:    health,
+	}
+	tlsCfg, protect, err := secureListener(cfg, log)
+	if err != nil {
+		return err
+	}
+
 	ln := o.Listener
 	if ln == nil {
 		if ln, err = (&net.ListenConfig{}).Listen(ctx, "tcp", cfg.ListenAddress); err != nil {
+			return err
+		}
+	}
+	probeLn := o.ProbeListener
+	if probeLn == nil && cfg.ProbeAddress != "" {
+		if probeLn, err = (&net.ListenConfig{}).Listen(ctx, "tcp", cfg.ProbeAddress); err != nil {
+			_ = ln.Close()
 			return err
 		}
 	}
@@ -137,15 +206,6 @@ func Run(ctx context.Context, cfg config.Config, o Options) error {
 	defer wg.Wait()
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-
-	var pollers atomic.Pointer[[]*poller.Poller]
-	pollers.Store(&[]*poller.Poller{})
-	srvOpts := server.Options{
-		Pollers:   func() []*poller.Poller { return *pollers.Load() },
-		Version:   o.Version,
-		GoVersion: runtime.Version(),
-		Runtime:   func(p *expo.Page) { runtimestats.Render(p, os.DirFS("/")) },
-	}
 
 	if cfg.AnyService() {
 		userAgent := "osmex/" + o.Version
@@ -193,6 +253,7 @@ func Run(ctx context.Context, cfg config.Config, o Options) error {
 				ps = append(ps, m.Build(client.Service(m.Spec), cfg, poller.WithLogger(log))...)
 			}
 			pollers.Store(&ps)
+			settled.Store(true)
 			for _, p := range ps {
 				wg.Go(func() { p.Run(ctx) })
 			}
@@ -216,6 +277,18 @@ func Run(ctx context.Context, cfg config.Config, o Options) error {
 				// could fail and would leave the exporter without pollers.
 				startServices(selectServices(auth.Catalog(), cfg.OS.Region, cfg.OS.Interface, cfg.Excluded, log))
 			})
+			wg.Go(func() {
+				select {
+				case <-auth.Attempted():
+				case <-ctx.Done():
+					return
+				}
+				select {
+				case <-auth.Ready(): // succeeded: settled once the services start
+				default:
+					settled.Store(true)
+				}
+			})
 		} else {
 			var services []Service
 			for _, m := range Services {
@@ -228,21 +301,46 @@ func Run(ctx context.Context, cfg config.Config, o Options) error {
 		}
 	}
 
-	srv := &http.Server{Handler: server.Handler(srvOpts), ReadHeaderTimeout: 10 * time.Second}
-	serveErr := make(chan error, 1)
-	go func() { serveErr <- srv.Serve(ln) }()
-	log.Info("serving metrics", "address", ln.Addr().String())
+	if !cfg.AnyService() {
+		settled.Store(true)
+	}
+
+	srv := newServer(protect(server.Handler(srvOpts)), tlsCfg)
+	servers := []*http.Server{srv}
+	serveErr := make(chan error, 2)
+	go func() {
+		if tlsCfg != nil {
+			// The certificate comes from tlsCfg, which reloads it, rather than from file names here.
+			serveErr <- srv.ServeTLS(ln, "", "")
+			return
+		}
+		serveErr <- srv.Serve(ln)
+	}()
+	log.Info("serving metrics", "address", ln.Addr().String(), "tls", cfg.ListenTLS(), "client_certificate", cfg.ListenTLSClientCAFile != "",
+		"auth", cfg.ListenAuth())
+	if probeLn != nil {
+		probeSrv := newServer(server.ProbeHandler(health), nil)
+		servers = append(servers, probeSrv)
+		go func() { serveErr <- probeSrv.Serve(probeLn) }()
+		log.Info("serving probes", "address", probeLn.Addr().String())
+	}
 
 	select {
 	case err := <-serveErr:
+		for _, s := range servers {
+			_ = s.Close()
+		}
 		return err
 	case <-ctx.Done():
 	}
 	// ctx is already cancelled here; shut down on a context that keeps its values but not its cancellation.
 	shutdownCtx, cancelShutdown := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
 	defer cancelShutdown()
-	if err := srv.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		return err
+	var errs []error
+	for _, s := range servers {
+		if err := s.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errs = append(errs, err)
+		}
 	}
-	return nil
+	return errors.Join(errs...)
 }

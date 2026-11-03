@@ -55,6 +55,7 @@ type Auth struct {
 
 	ready     chan struct{}
 	readyOnce sync.Once
+	attempted chan struct{}
 }
 
 const (
@@ -79,7 +80,7 @@ func NewAuth(cfg AuthConfig) *Auth {
 		cfg.Timeout = defaultAuthTimeout
 	}
 	cfg.HTTP = withRedirectPolicy(cfg.HTTP)
-	return &Auth{cfg: cfg, tokensURL: tokensURL(cfg.URL), ready: make(chan struct{})}
+	return &Auth{cfg: cfg, tokensURL: tokensURL(cfg.URL), ready: make(chan struct{}), attempted: make(chan struct{})}
 }
 
 // Token returns a token valid for at least another minute, authenticating if needed.
@@ -126,19 +127,26 @@ func (a *Auth) Catalog() Catalog {
 // Ready is closed after the first successful authentication.
 func (a *Auth) Ready() <-chan struct{} { return a.ready }
 
+// Attempted is closed when Run's first authentication has finished, successfully or not. After a success, Ready is
+// already closed.
+func (a *Auth) Attempted() <-chan struct{} { return a.attempted }
+
 // Run authenticates with exponential backoff until it succeeds, then refreshes the token about
 // five minutes before it expires (at half its remaining lifetime for short-lived tokens).
 // It returns when ctx is done.
 func (a *Auth) Run(ctx context.Context) {
 	backoff := minRetryDelay
 	force := false
-	for {
+	for first := true; ; first = false {
 		var wait time.Duration
 		tok, err := a.get(ctx, force)
+		if ctx.Err() != nil {
+			return
+		}
+		if first {
+			close(a.attempted)
+		}
 		if err != nil {
-			if ctx.Err() != nil {
-				return
-			}
 			a.cfg.Logger.Warn("authentication failed", "err", err, "retry_in", backoff)
 			wait = backoff
 			backoff = min(backoff*2, maxRetryDelay)

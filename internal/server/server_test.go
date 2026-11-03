@@ -209,10 +209,77 @@ func TestContentType(t *testing.T) {
 	}
 }
 
-func TestHealthz(t *testing.T) {
-	rr := get(t, Handler(opts(nil, time.Now)), "/healthz")
-	if rr.Code != 200 || rr.Body.String() != "ok\n" {
-		t.Errorf("code %d body %q", rr.Code, rr.Body)
+func TestProbesWithoutPollers(t *testing.T) {
+	for _, h := range []http.Handler{Handler(opts(nil, time.Now)), ProbeHandler(NewHealth(func() []*poller.Poller { return nil }, nil, nil))} {
+		for _, path := range ProbePaths {
+			if rr := get(t, h, path); rr.Code != 200 || rr.Body.String() != "ok\n" {
+				t.Errorf("%s: code %d body %q", path, rr.Code, rr.Body)
+			}
+		}
+	}
+	if rr := get(t, ProbeHandler(NewHealth(func() []*poller.Poller { return nil }, nil, nil)), "/metrics"); rr.Code != 404 {
+		t.Errorf("probe handler serves /metrics: code %d", rr.Code)
+	}
+	if rr := get(t, Handler(opts(nil, time.Now)), "/healthz"); rr.Code != 404 {
+		t.Errorf("/healthz: code %d", rr.Code)
+	}
+}
+
+func TestLiveness(t *testing.T) {
+	now := t0
+	clk := func() time.Time { return now }
+	ok := fixedPoller("ok", "a 1\n", clk)
+	failing := fixedPoller("failing", "", clk)
+	notStarted := fixedPoller("not-started", "a 1\n", clk)
+	h := NewHealth(func() []*poller.Poller { return []*poller.Poller{ok, failing, notStarted} }, nil, clk)
+	ok.RunOnce(t.Context())
+	failing.RunOnce(t.Context())
+
+	// A failing API is not a stalled loop, and a poller whose loop has not started yet is not stalled either.
+	now = now.Add(liveIntervals * time.Minute)
+	if !h.Live() {
+		t.Error("not live within the window")
+	}
+	now = now.Add(time.Second)
+	if h.Live() {
+		t.Error("live after the window")
+	}
+	if rr := get(t, ProbeHandler(h), "/livez"); rr.Code != 503 {
+		t.Errorf("/livez: code %d", rr.Code)
+	}
+	ok.RunOnce(t.Context())
+	failing.RunOnce(t.Context())
+	if !h.Live() {
+		t.Error("not live after both pollers ran again")
+	}
+}
+
+func TestReadinessLatches(t *testing.T) {
+	a := fixedPoller("a", "a 1\n", time.Now)
+	b := fixedPoller("b", "", time.Now)
+	ps := []*poller.Poller{a}
+	settled := false
+	h := NewHealth(func() []*poller.Poller { return ps }, func() bool { return settled }, nil)
+	probe := func() int { return get(t, ProbeHandler(h), "/readyz").Code }
+
+	a.RunOnce(t.Context())
+	if probe() != 503 {
+		t.Error("ready before the pollers were settled")
+	}
+	settled = true
+	ps = []*poller.Poller{a, b}
+	if probe() != 503 {
+		t.Error("ready before every poller's first poll")
+	}
+	b.RunOnce(t.Context()) // fails: an attempt all the same
+	if probe() != 200 {
+		t.Error("not ready after every poller's first poll")
+	}
+	// Once ready, always ready: a new poller that has not polled, or an unsettled set, changes nothing.
+	ps = append(ps, fixedPoller("c", "", time.Now))
+	settled = false
+	if probe() != 200 {
+		t.Error("readiness reverted")
 	}
 }
 

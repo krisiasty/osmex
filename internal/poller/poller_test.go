@@ -336,3 +336,40 @@ func TestShutdownDuringPollIsNotAFailure(t *testing.T) {
 		})
 	}
 }
+
+func TestAttempts(t *testing.T) {
+	clk := &clock{t: time.Unix(1_800_000_000, 0)}
+	p := New("p", every(time.Minute), func(context.Context) ([]byte, error) { return nil, errors.New("boom") }, WithClock(clk.now))
+	if !p.LastAttempt().IsZero() || p.Attempted() {
+		t.Fatalf("before the first poll: LastAttempt %v, Attempted %v", p.LastAttempt(), p.Attempted())
+	}
+	p.RunOnce(t.Context())
+	// A failed poll is an attempt all the same.
+	if !p.LastAttempt().Equal(clk.now()) || !p.Attempted() {
+		t.Errorf("after a failed poll: LastAttempt %v, Attempted %v", p.LastAttempt(), p.Attempted())
+	}
+	clk.advance(time.Minute)
+	p.RunOnce(t.Context())
+	if !p.LastAttempt().Equal(clk.now()) {
+		t.Errorf("LastAttempt %v, want %v", p.LastAttempt(), clk.now())
+	}
+}
+
+func TestRunCountsAsAttemptWhileWaiting(t *testing.T) {
+	// A poller waiting for its sources has started, so liveness must not see it as never having run.
+	clk := &clock{t: time.Unix(1_800_000_000, 0)}
+	src := New("src", every(time.Minute), func(context.Context) ([]byte, error) { return nil, nil })
+	p := New("p", every(time.Minute), func(context.Context) ([]byte, error) { return nil, nil }, WithClock(clk.now), WaitForFirstPoll(time.Hour, src))
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() { p.Run(ctx); close(done) }()
+	deadline := time.Now().Add(5 * time.Second)
+	for p.LastAttempt().IsZero() && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	cancel()
+	<-done
+	if !p.LastAttempt().Equal(clk.now()) || p.Attempted() {
+		t.Errorf("waiting: LastAttempt %v, Attempted %v", p.LastAttempt(), p.Attempted())
+	}
+}

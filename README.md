@@ -72,7 +72,11 @@ No service is enabled by default; without service flags only the exporter's own 
 | `-nova`, `-cinder`, `-neutron`, `-octavia`, `-barbican` | off | Enable a service |
 | `-all` | off | Enable every service with an endpoint for `OS_REGION_NAME` and `OS_INTERFACE` (resolved once, after the first successful authentication); other services are skipped and logged. A service with endpoints in several regions and no `OS_REGION_NAME` stays enabled and logs an error |
 | `-no-nova`, `-no-cinder`, `-no-neutron`, `-no-octavia`, `-no-barbican` | off | Exclude a service. An exclusion wins over `-all` and over the service's own flag, so `-all -no-barbican` enables every available service except Barbican. A `-no-` flag for a service that is not enabled has no effect and logs a warning |
-| `-listen-address` | `127.0.0.1:9180` | Address for `/metrics` and `/healthz`; no TLS or authentication |
+| `-listen-address` | `127.0.0.1:9180` | Address for `/metrics`, `/livez` and `/readyz` |
+| `-probe-address` | | Also serve `/livez` and `/readyz`, and nothing else, on this address over plain HTTP without authentication; see [Securing the endpoint](#securing-the-endpoint) |
+| `-listen-tls-cert-file`, `-listen-tls-key-file` | | Serve HTTPS with this PEM certificate and key; set both or neither |
+| `-listen-tls-client-ca-file` | | Require a client certificate signed by this PEM bundle; needs the certificate and key |
+| `-listen-auth-username`, `-listen-auth-password-file` | | Require basic authentication with this username and the password in this file; set both or neither |
 | `-nova-servers-interval` | `60s` | |
 | `-nova-limits-interval` | `5m` | |
 | `-cinder-interval` | `60s` | Volumes; raise it if the Cinder API is slow |
@@ -120,7 +124,51 @@ investigation rather than in normal operation.
   The global series (`build_info`, `auth_up`, runtime metrics) are always included. Any module of an enabled service is accepted, including one that
   has not started yet, such as with `-all` before the first successful authentication or when the service is missing from the catalog, and so is
   `keystone-credential` when any service is enabled. Other names return 400.
-- `/healthz`: returns 200 while the process serves; it does not reflect OpenStack API health.
+- `/livez`: 200 while every module keeps polling; 503 when a module has not started a poll for 10 of its intervals. A failing OpenStack API or
+  Keystone does not fail it: restarting would not help, and `api_up` and `auth_up` report those failures.
+- `/readyz`: 503 until osmex has finished starting, then 200 until it exits. Starting is finished when every module has finished its first
+  poll, successfully or not; with `-all` it waits for the modules to start after the first successful authentication, or finishes as soon as
+  the first authentication fails. It never goes back to 503, so OpenStack trouble never takes the exporter out of service.
+
+`/livez` and `/readyz` carry no OpenStack data and never require authentication.
+
+### Securing the endpoint
+
+osmex serves plain HTTP without authentication by default, on the loopback address. Its metrics name the project's servers, volumes, addresses and
+load balancers, so when the scrape crosses a network you don't control, TLS is required: osmex's own, or a TLS-terminating proxy in front of osmex
+listening only where that proxy can reach it. Authentication comes on top of TLS, never instead of it. Basic authentication over plain HTTP sends
+the password, readable, with every scrape, however securely it is stored, so use it without TLS only on a network you trust, such as loopback behind
+a proxy; osmex logs a warning when it is configured that way.
+
+```sh
+# HTTPS
+osmex -nova -listen-address=:9180 -listen-tls-cert-file=/etc/osmex/tls.crt -listen-tls-key-file=/etc/osmex/tls.key
+
+# HTTPS with mutual TLS: the scraper must present a certificate signed by ca.crt, and is refused during the handshake otherwise
+osmex -nova -listen-address=:9180 -listen-tls-cert-file=/etc/osmex/tls.crt -listen-tls-key-file=/etc/osmex/tls.key \
+  -listen-tls-client-ca-file=/etc/osmex/ca.crt
+
+# HTTPS with basic authentication
+osmex -nova -listen-address=:9180 -listen-tls-cert-file=/etc/osmex/tls.crt -listen-tls-key-file=/etc/osmex/tls.key \
+  -listen-auth-username=prometheus -listen-auth-password-file=/etc/osmex/scrape-password
+```
+
+- Every file is read at startup, so a wrong path or an empty password file stops osmex before it serves. A private key or password file readable
+  beyond its owner logs a warning; group-readable is fine when the group is one osmex runs in, as with a Kubernetes secret mounted under the pod's
+  `fsGroup`.
+- TLS 1.2 is the minimum. The certificate and key are checked for changes at most every 30 seconds when a connection arrives, and reloaded when
+  they change, so a renewal by cert-manager or another tool needs no restart. A pair that fails to load, such as a half-written one, keeps the
+  previous certificate in use.
+- The password file loses trailing CR/LF characters. The first request at least 30 seconds after the last read re-reads the file before its
+  credentials are checked, so a rotated Kubernetes secret is picked up without a restart: from that request on, the new password is accepted and
+  the old one refused. Until then, the old password still works and the new one is refused. A file that can't be read keeps the previous password.
+  Credentials are compared in constant time, and neither the password nor a failed attempt's credentials are logged.
+- A client certificate is required by the listener, not by a path, so a Kubernetes probe without one is refused with mutual TLS. Serve the
+  probes on a separate plain-HTTP listener with `-probe-address`; it serves only `/livez` and `/readyz` and returns 404 for anything else.
+- Under systemd, the private key and password are stored encrypted with `systemd-creds` and loaded with `LoadCredentialEncrypted=`, whose copies are
+  made at start, so a renewed key or rotated password reaches osmex only after `systemctl restart osmex`. See
+  [the scrape password and TLS key](docs/credentials.md#the-scrape-password-and-tls-key-under-systemd) and the commented example in
+  [deploy/systemd/osmex.service](deploy/systemd/osmex.service).
 
 ## Services and metrics
 
@@ -441,7 +489,8 @@ panels so each code shows its name:
    The example unit loads it with `LoadCredentialEncrypted=` and fails to start without it.
 5. Install [deploy/systemd/osmex.service](deploy/systemd/osmex.service) to `/etc/systemd/system/`, adjust the service flags in `ExecStart`, then run
    `systemctl daemon-reload && systemctl enable --now osmex`.
-6. Point vmagent at `http://127.0.0.1:9180/metrics` with a 60 s scrape interval.
+6. Point vmagent at `http://127.0.0.1:9180/metrics` with a 60 s scrape interval. To scrape over the network, see
+   [Securing the endpoint](#securing-the-endpoint).
 
 ## Development
 
