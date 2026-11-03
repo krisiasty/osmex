@@ -508,6 +508,23 @@ while osmex runs; rotating the OpenStack application credential requires a pod r
 
 ## Development
 
+### Tools
+
+| Tool | Needed for | Required | Repository |
+| --- | --- | --- | --- |
+| Go 1.27.3 or newer | building and testing | yes | [go.dev/dl](https://go.dev/dl/) |
+| Task | every `task` command | yes | [go-task/task](https://github.com/go-task/task) |
+| GoReleaser v2 | `task build`, `task check` and `task release`; its built-in [ko](https://github.com/ko-build/ko) integration builds the container images, so ko needs no separate install | yes | [goreleaser/goreleaser](https://github.com/goreleaser/goreleaser) |
+| golangci-lint v2 | `task lint` and `task check` | yes | [golangci/golangci-lint](https://github.com/golangci/golangci-lint) |
+| gohawk | `task lint` and `task check` | yes | [kojah/gohawk](https://github.com/kojah/gohawk) |
+| govulncheck | `task check` | yes | [golang/vuln](https://github.com/golang/vuln) |
+| GitHub CLI | the token for `task release` when `GITHUB_TOKEN` is not set | no | [cli/cli](https://github.com/cli/cli) |
+| crane | refreshing the pinned base image digest, and inspecting published images | no | [google/go-containerregistry](https://github.com/google/go-containerregistry/tree/main/cmd/crane) |
+
+Docker is not needed for any of them.
+
+### Tasks
+
 The [Taskfile](Taskfile.yml) provides shortcuts using [go-task](https://taskfile.dev/). Run `task` to list them:
 
 ```sh
@@ -556,6 +573,8 @@ Linux archives also contain the systemd unit and environment example from `deplo
 GoReleaser's built-in [Ko integration](https://goreleaser.com/customization/package/ko/) builds and publishes the Linux images directly to GHCR.
 It inherits the existing `linux` build's main package, static-build environment and version flags. It rebuilds the binary using those settings;
 the Go build cache avoids recompiling unchanged packages. Docker, Buildx and a separate `ko` executable are not required.
+The base image is pinned by digest in `.goreleaser.yaml` and nothing updates it automatically; before a release, compare it with the current digest
+from `crane digest gcr.io/distroless/static-debian13:nonroot`.
 
 Validate the configuration and build a local snapshot of the release archives without publishing:
 
