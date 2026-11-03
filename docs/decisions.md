@@ -150,6 +150,27 @@ The secret is read from the systemd credential `application-credential-secret`, 
 itself instead of taking its path from an `Environment=` line, because systemd lets `EnvironmentFile=` override `Environment=`, and a variable
 left in the environment file would silently replace the encrypted secret.
 
+### The probes never require authentication
+
+`/livez` and `/readyz` are exempt from basic authentication, matched by exact path. A Kubernetes probe sends no credentials, so requiring them
+would turn a health check into a restart loop, and the probes report only whether osmex itself works. Mutual TLS can't exempt a path, because
+the handshake refuses a client without a certificate before any path is known, so `-probe-address` serves the probes on a second, plain-HTTP
+listener that serves nothing else.
+
+### A rejected scrape re-reads the password, at most every 30 seconds
+
+A mounted Kubernetes secret is updated in place, so the password is re-read when a request is rejected rather than only at startup. The re-read is
+limited to once every 30 seconds across all requests: anyone who can reach the port decides when a request arrives, and an unconditional re-read
+would make every bad request a file read. The certificate is checked for changes on the same interval, when a connection arrives, rather than on
+a timer.
+
+### Readiness is a startup latch
+
+`/readyz` turns 200 once every module has finished its first poll, successfully or not, and never turns back. A not-ready exporter is taken out
+of a Kubernetes Service exactly when its `api_up` and `auth_up` would explain an OpenStack outage, so readiness doesn't follow OpenStack health.
+For the same reason, with `-all` it doesn't wait for a Keystone that keeps failing: the first failed authentication finishes startup. `/livez`
+fails only when a module stops starting polls for 10 of its intervals, because a restart can fix a stalled poll loop and nothing else.
+
 ### Credential ids appear in `-debug` URLs
 
 `-debug` logs request paths as they are, including the user and application credential ids in the `keystone-credential` call. Whoever runs

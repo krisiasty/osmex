@@ -82,6 +82,39 @@ func TestAuthBadCredentials(t *testing.T) {
 	}
 }
 
+func TestAuthAttempted(t *testing.T) {
+	for _, fail := range []bool{false, true} {
+		cloud := ostest.New(t)
+		cloud.FailAuth.Store(fail)
+		a := cloud.Auth(t)
+		select {
+		case <-a.Attempted():
+			t.Fatal("Attempted closed before Run")
+		default:
+		}
+		ctx, cancel := context.WithCancel(t.Context())
+		done := make(chan struct{})
+		go func() { a.Run(ctx); close(done) }()
+		select {
+		case <-a.Attempted():
+		case <-time.After(5 * time.Second):
+			t.Fatalf("fail=%v: Attempted not closed after the first authentication", fail)
+		}
+		select {
+		case <-a.Ready():
+			if fail {
+				t.Error("Ready closed after a failed authentication")
+			}
+		default:
+			if !fail {
+				t.Error("Ready not closed when Attempted closed after a success")
+			}
+		}
+		cancel()
+		<-done
+	}
+}
+
 func TestInvalidate(t *testing.T) {
 	cloud := ostest.New(t)
 	a := cloud.Auth(t)

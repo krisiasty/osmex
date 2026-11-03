@@ -49,9 +49,10 @@ type Poller struct {
 	firstDone chan struct{} // closed when the first poll has finished
 	firstOnce sync.Once
 
-	good     atomic.Pointer[snapshot]
-	up       atomic.Bool
-	duration atomic.Int64
+	good        atomic.Pointer[snapshot]
+	up          atomic.Bool
+	duration    atomic.Int64
+	lastAttempt atomic.Int64 // UnixNano; see LastAttempt
 
 	mu     sync.Mutex
 	errors map[string]uint64
@@ -166,6 +167,7 @@ func (p *Poller) Interval() time.Duration { return p.interval() }
 // Run polls immediately, then after a random offset of up to one interval, then every interval
 // with ±10% jitter. Ticks that pass while a poll runs are skipped. Run returns when ctx is done.
 func (p *Poller) Run(ctx context.Context) {
+	p.lastAttempt.Store(p.now().UnixNano())
 	if len(p.waitFor) > 0 {
 		limit := time.NewTimer(p.waitMax)
 	wait:
@@ -206,6 +208,7 @@ func (p *Poller) RunOnce(ctx context.Context) {
 	defer cancel()
 	defer p.firstOnce.Do(func() { close(p.firstDone) })
 	at := p.now()
+	p.lastAttempt.Store(at.UnixNano())
 	reported := &pollState{at: at, interval: p.Interval(), now: p.now}
 	ctx = context.WithValue(ctx, pollKey{}, reported)
 	body, err := p.fn(ctx)
@@ -243,6 +246,24 @@ func (p *Poller) Body(now time.Time) []byte {
 		return s.body
 	}
 	return nil
+}
+
+// LastAttempt returns when the last poll started, or when Run started before its first poll; zero before either.
+func (p *Poller) LastAttempt() time.Time {
+	if n := p.lastAttempt.Load(); n != 0 {
+		return time.Unix(0, n)
+	}
+	return time.Time{}
+}
+
+// Attempted reports whether the first poll has finished, successfully or not.
+func (p *Poller) Attempted() bool {
+	select {
+	case <-p.firstDone:
+		return true
+	default:
+		return false
+	}
 }
 
 // Status returns the poller state for self-metrics.

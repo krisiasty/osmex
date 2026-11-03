@@ -1,4 +1,4 @@
-// Package server serves /metrics and /healthz.
+// Package server serves /metrics, /livez and /readyz.
 package server
 
 import (
@@ -24,6 +24,7 @@ type Options struct {
 	GoVersion string
 	Now       func() time.Time // nil → time.Now
 	Runtime   func(*expo.Page) // adds the process's own runtime metrics at scrape time; nil → none
+	Health    *Health          // nil → NewHealth(Pollers, nil, Now)
 }
 
 // Handler returns the exporter's HTTP handler.
@@ -31,9 +32,12 @@ func Handler(o Options) http.Handler {
 	if o.Now == nil {
 		o.Now = time.Now
 	}
+	if o.Health == nil {
+		o.Health = NewHealth(o.Pollers, nil, o.Now)
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, r *http.Request) { serveMetrics(w, r, o) })
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { _, _ = io.WriteString(w, "ok\n") })
+	o.Health.register(mux)
 	return mux
 }
 

@@ -15,6 +15,11 @@ LoadCredentialEncrypted=application-credential-secret:/etc/osmex/application-cre
 # Enable the services this customer uses, or -all; -no-<service> excludes one, for example -all -no-barbican.
 # Listens on 127.0.0.1:9180 by default.
 ExecStart=/usr/local/bin/osmex -nova -cinder -neutron
+# To scrape over the network with TLS and basic authentication, load the key and password as credentials (%d is the
+# credentials directory) and replace ExecStart. The copies are made at start: restart osmex after renewing or rotating them.
+#LoadCredential=tls.key:/etc/osmex/tls.key
+#LoadCredential=scrape-password:/etc/osmex/scrape-password
+#ExecStart=/usr/local/bin/osmex -nova -cinder -neutron -listen-address=:9180 -listen-tls-cert-file=/etc/osmex/tls.crt -listen-tls-key-file=%d/tls.key -listen-auth-username=prometheus -listen-auth-password-file=%d/scrape-password
 Restart=on-failure
 RestartSec=10s
 

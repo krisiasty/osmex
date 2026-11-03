@@ -3,20 +3,16 @@ package config
 import (
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
+
+	"github.com/krisiasty/osmex/internal/secret"
 )
 
 // SystemdCredential is the systemd credential that holds the application credential secret: osmex reads
 // $CREDENTIALS_DIRECTORY/application-credential-secret, which LoadCredentialEncrypted= in the example unit provides.
 const SystemdCredential = "application-credential-secret"
-
-// maxSecretSize bounds a secret file. Keystone's secrets are far smaller; the bound stops a wrong path, such as a
-// device, from being read without end.
-const maxSecretSize = 4 << 10
 
 var (
 	errBothSecrets = errors.New("set only one of OS_APPLICATION_CREDENTIAL_SECRET and OS_APPLICATION_CREDENTIAL_SECRET_FILE")
@@ -53,40 +49,10 @@ func (c *Config) LoadSecret() error {
 }
 
 func (e *OSEnv) loadSecretFile(path, source string) error {
-	secret, err := readSecretFile(path)
+	s, err := secret.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("reading %s: %w", source, err)
 	}
-	e.CredentialSecret = secret
+	e.CredentialSecret = s
 	return nil
-}
-
-// readSecretFile reads a secret from a regular file of at most maxSecretSize bytes and removes trailing CR/LF
-// characters. A file with nothing but whitespace is an error.
-func readSecretFile(path string) (string, error) {
-	// Stat before opening: opening a FIFO, such as /dev/stdin fed by a pipe, blocks until a writer appears.
-	st, err := os.Stat(path)
-	if err != nil {
-		return "", err
-	}
-	if !st.Mode().IsRegular() {
-		return "", fmt.Errorf("%s is not a regular file", path)
-	}
-	f, err := os.Open(filepath.Clean(path))
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = f.Close() }()
-	b, err := io.ReadAll(io.LimitReader(f, maxSecretSize+1))
-	switch {
-	case err != nil:
-		return "", err
-	case len(b) > maxSecretSize:
-		return "", fmt.Errorf("%s is larger than %d bytes", path, maxSecretSize)
-	}
-	secret := strings.TrimRight(string(b), "\r\n")
-	if strings.TrimSpace(secret) == "" {
-		return "", fmt.Errorf("%s contains an empty secret", path)
-	}
-	return secret, nil
 }

@@ -2,11 +2,14 @@ package app
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -53,9 +56,8 @@ func fullCloud(t *testing.T, types ...string) *ostest.Cloud {
 	return cloud
 }
 
-// start runs the exporter with args against cloud (nil for no cloud) and returns the metrics URL.
-func start(t *testing.T, cloud *ostest.Cloud, args ...string) string {
-	t.Helper()
+// cloudEnv returns the environment for an exporter talking to cloud (nil for no cloud).
+func cloudEnv(t *testing.T, cloud *ostest.Cloud) map[string]string {
 	env := map[string]string{}
 	if cloud != nil {
 		env = map[string]string{
@@ -68,19 +70,27 @@ func start(t *testing.T, cloud *ostest.Cloud, args ...string) string {
 			env["OS_CACERT"] = cloud.CACertFile(t)
 		}
 	}
-	cfg, err := config.Parse(args, func(k string) string { return env[k] })
-	if err != nil {
-		t.Fatal(err)
-	}
+	return env
+}
+
+func localListener(t *testing.T) net.Listener {
+	t.Helper()
 	ln, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
+	return ln
+}
+
+// serve runs the exporter until the test ends.
+func serve(t *testing.T, cfg config.Config, o Options) {
+	t.Helper()
+	if o.Logger == nil {
+		o.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan error, 1)
-	go func() {
-		done <- Run(ctx, cfg, Options{Version: "test", Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Listener: ln})
-	}()
+	go func() { done <- Run(ctx, cfg, o) }()
 	t.Cleanup(func() {
 		cancel()
 		select {
@@ -92,6 +102,18 @@ func start(t *testing.T, cloud *ostest.Cloud, args ...string) string {
 			t.Error("Run did not return after cancel")
 		}
 	})
+}
+
+// start runs the exporter with args against cloud (nil for no cloud) and returns the metrics URL.
+func start(t *testing.T, cloud *ostest.Cloud, args ...string) string {
+	t.Helper()
+	env := cloudEnv(t, cloud)
+	cfg, err := config.Parse(args, func(k string) string { return env[k] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	ln := localListener(t)
+	serve(t, cfg, Options{Version: "test", Listener: ln})
 	return "http://" + ln.Addr().String() + "/metrics"
 }
 
@@ -476,4 +498,177 @@ func TestRunDebugLogsExchanges(t *testing.T) {
 	if logs := run("-nova"); strings.Contains(logs, `msg="http request"`) {
 		t.Errorf("exchanges logged without -debug:\n%s", logs)
 	}
+}
+
+// status returns the response code for url, failing the test if the request fails.
+func status(t *testing.T, c *http.Client, url string, user, pass string) int {
+	t.Helper()
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user != "" {
+		req.SetBasicAuth(user, pass)
+	}
+	resp, err := c.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	return resp.StatusCode
+}
+
+// eventuallyStatus requests url until it answers with want.
+func eventuallyStatus(t *testing.T, url string, want int) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for got := status(t, http.DefaultClient, url, "", ""); got != want; got = status(t, http.DefaultClient, url, "", "") {
+		if time.Now().After(deadline) {
+			t.Fatalf("%s: code %d, want %d", url, got, want)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+func TestRunTLSAndAuth(t *testing.T) {
+	dir := t.TempDir()
+	cert, key := ostest.WriteCert(t, dir, "server")
+	pwFile := filepath.Join(dir, "pw")
+	if err := os.WriteFile(pwFile, []byte("scrape-secret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Parse([]string{"-listen-tls-cert-file=" + cert, "-listen-tls-key-file=" + key,
+		"-listen-auth-username=prometheus", "-listen-auth-password-file=" + pwFile}, func(string) string { return "" })
+	if err != nil {
+		t.Fatal(err)
+	}
+	ln := localListener(t)
+	var logs syncBuffer
+	serve(t, cfg, Options{Listener: ln, Logger: slog.New(slog.NewTextHandler(&logs, nil))})
+
+	pem, err := os.ReadFile(filepath.Clean(cert))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool := x509.NewCertPool()
+	pool.AppendCertsFromPEM(pem)
+	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12}}}
+	base := "https://" + ln.Addr().String()
+	for _, c := range []struct {
+		path, user, pass string
+		want             int
+	}{
+		{"/metrics", "prometheus", "scrape-secret", 200},
+		{"/metrics", "", "", 401},
+		{"/metrics", "prometheus", "wrong", 401},
+		{"/livez", "", "", 200},
+		{"/readyz", "", "", 200},
+	} {
+		if got := status(t, client, base+c.path, c.user, c.pass); got != c.want {
+			t.Errorf("%s as %q: code %d, want %d", c.path, c.user, got, c.want)
+		}
+	}
+	if !strings.Contains(logs.String(), "tls=true") || !strings.Contains(logs.String(), "auth=true") {
+		t.Errorf("startup log does not report TLS and auth:\n%s", logs.String())
+	}
+	if strings.Contains(logs.String(), "in clear") {
+		t.Errorf("warned about cleartext with TLS on:\n%s", logs.String())
+	}
+}
+
+func TestRunProbeListener(t *testing.T) {
+	pwFile := filepath.Join(t.TempDir(), "pw")
+	if err := os.WriteFile(pwFile, []byte("scrape-secret"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Parse([]string{"-probe-address=127.0.0.1:0", "-listen-auth-username=prometheus", "-listen-auth-password-file=" + pwFile},
+		func(string) string { return "" })
+	if err != nil {
+		t.Fatal(err)
+	}
+	ln, probeLn := localListener(t), localListener(t)
+	var logs syncBuffer
+	serve(t, cfg, Options{Listener: ln, ProbeListener: probeLn, Logger: slog.New(slog.NewTextHandler(&logs, nil))})
+
+	main, probes := "http://"+ln.Addr().String(), "http://"+probeLn.Addr().String()
+	for url, want := range map[string]int{
+		main + "/metrics":   401,
+		main + "/livez":     200,
+		probes + "/livez":   200,
+		probes + "/readyz":  200,
+		probes + "/metrics": 404,
+	} {
+		if got := status(t, http.DefaultClient, url, "", ""); got != want {
+			t.Errorf("%s: code %d, want %d", url, got, want)
+		}
+	}
+	// The probe listener serves nothing else, even with credentials.
+	if got := status(t, http.DefaultClient, probes+"/metrics", "prometheus", "scrape-secret"); got != 404 {
+		t.Errorf("probe listener /metrics with credentials: code %d, want 404", got)
+	}
+	if !strings.Contains(logs.String(), "in clear") {
+		t.Errorf("no warning about basic authentication without TLS:\n%s", logs.String())
+	}
+}
+
+func TestRunListenerFileErrors(t *testing.T) {
+	dir := t.TempDir()
+	cert, key := ostest.WriteCert(t, dir, "server")
+	for name, args := range map[string][]string{
+		"missing certificate":   {"-listen-tls-cert-file=" + filepath.Join(dir, "none"), "-listen-tls-key-file=" + key},
+		"missing client CA":     {"-listen-tls-cert-file=" + cert, "-listen-tls-key-file=" + key, "-listen-tls-client-ca-file=" + filepath.Join(dir, "none")},
+		"missing password file": {"-listen-auth-username=u", "-listen-auth-password-file=" + filepath.Join(dir, "none")},
+	} {
+		cfg, err := config.Parse(args, func(string) string { return "" })
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := Run(t.Context(), cfg, Options{Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Listener: localListener(t)}); err == nil {
+			t.Errorf("%s: Run started", name)
+		}
+	}
+}
+
+func TestRunWarnsAboutLooseSecretFiles(t *testing.T) {
+	pwFile := filepath.Join(t.TempDir(), "pw")
+	if err := os.WriteFile(pwFile, []byte("scrape-secret"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(pwFile, 0o644); err != nil { //nolint:gosec // G302: the loose mode is what is under test
+		t.Fatal(err)
+	}
+	cfg, err := config.Parse([]string{"-listen-auth-username=u", "-listen-auth-password-file=" + pwFile}, func(string) string { return "" })
+	if err != nil {
+		t.Fatal(err)
+	}
+	var logs syncBuffer
+	serve(t, cfg, Options{Listener: localListener(t), Logger: slog.New(slog.NewTextHandler(&logs, nil))})
+	deadline := time.Now().Add(5 * time.Second)
+	for !strings.Contains(logs.String(), "serving metrics") && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if out := logs.String(); !strings.Contains(out, "readable beyond its owner") || !strings.Contains(out, "mode=0644") || strings.Contains(out, "scrape-secret") {
+		t.Errorf("log:\n%s", out)
+	}
+}
+
+func TestRunReadiness(t *testing.T) {
+	t.Run("explicit services", func(t *testing.T) {
+		url := strings.TrimSuffix(start(t, fullCloud(t, "compute"), "-nova"), "/metrics")
+		eventuallyStatus(t, url+"/readyz", 200)
+	})
+	t.Run("all, after the services start", func(t *testing.T) {
+		url := strings.TrimSuffix(start(t, fullCloud(t, "compute"), "-all"), "/metrics")
+		eventuallyStatus(t, url+"/readyz", 200)
+		eventually(t, url+"/metrics", `openstack_exporter_api_up{poller="nova-servers"}`)
+	})
+	t.Run("all, Keystone failing", func(t *testing.T) {
+		// Ready all the same, so a scraper that skips endpoints that are not ready still sees auth_up 0.
+		cloud := fullCloud(t, "compute")
+		cloud.FailAuth.Store(true)
+		url := strings.TrimSuffix(start(t, cloud, "-all"), "/metrics")
+		eventuallyStatus(t, url+"/readyz", 200)
+		eventually(t, url+"/metrics", "openstack_exporter_auth_up 0")
+		eventuallyStatus(t, url+"/livez", 200)
+	})
 }

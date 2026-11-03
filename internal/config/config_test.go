@@ -287,3 +287,46 @@ func TestCinderCopyIntervalsFollowVolumes(t *testing.T) {
 		t.Error("negative snapshots interval accepted")
 	}
 }
+
+func TestListenFlags(t *testing.T) {
+	c, err := Parse([]string{
+		"-probe-address=:9181",
+		"-listen-tls-cert-file=/c", "-listen-tls-key-file=/k", "-listen-tls-client-ca-file=/ca",
+		"-listen-auth-username=prometheus", "-listen-auth-password-file=/pw",
+	}, env(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.ProbeAddress != ":9181" || c.ListenTLSCertFile != "/c" || c.ListenTLSKeyFile != "/k" || c.ListenTLSClientCAFile != "/ca" ||
+		c.ListenAuthUsername != "prometheus" || c.ListenAuthPasswordFile != "/pw" || !c.ListenTLS() || !c.ListenAuth() {
+		t.Errorf("config = %+v", c)
+	}
+	if c, _ := Parse(nil, env(nil)); c.ProbeAddress != "" || c.ListenTLS() || c.ListenAuth() {
+		t.Errorf("defaults: %+v", c)
+	}
+}
+
+func TestListenFlagsMustFit(t *testing.T) {
+	for _, args := range [][]string{
+		{"-probe-address=127.0.0.1:9180"},
+		{"-listen-address=:9100", "-probe-address=:9100"},
+		{"-listen-tls-cert-file=/c"},
+		{"-listen-tls-key-file=/k"},
+		{"-listen-tls-client-ca-file=/ca"},
+		{"-listen-tls-client-ca-file=/ca", "-listen-tls-cert-file=/c"},
+		{"-listen-auth-username=prometheus"},
+		{"-listen-auth-password-file=/pw"},
+	} {
+		if _, err := Parse(args, env(nil)); err == nil {
+			t.Errorf("%v accepted", args)
+		}
+	}
+}
+
+func TestParseReadsNoListenFile(t *testing.T) {
+	// Files are read when the listener is set up, like the credential secret by LoadSecret.
+	if _, err := Parse([]string{"-listen-tls-cert-file=/nonexistent/c", "-listen-tls-key-file=/nonexistent/k",
+		"-listen-auth-username=u", "-listen-auth-password-file=/nonexistent/pw"}, env(nil)); err != nil {
+		t.Errorf("Parse read a listener file: %v", err)
+	}
+}
