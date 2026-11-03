@@ -519,7 +519,7 @@ while osmex runs; rotating the OpenStack application credential requires a pod r
 | gohawk | `task lint` and `task check` | yes | [kojah/gohawk](https://github.com/kojah/gohawk) |
 | govulncheck | `task check` | yes | [golang/vuln](https://github.com/golang/vuln) |
 | GitHub CLI | the token for `task release` when `GITHUB_TOKEN` is not set | no | [cli/cli](https://github.com/cli/cli) |
-| crane | refreshing the pinned base image digest, and inspecting published images | no | [google/go-containerregistry](https://github.com/google/go-containerregistry/tree/main/cmd/crane) |
+| crane | `task base-image` and `task release`, to check the pinned base image digest; also handy for inspecting published images | for releases | [google/go-containerregistry](https://github.com/google/go-containerregistry/tree/main/cmd/crane) |
 
 Docker is not needed for any of them.
 
@@ -538,6 +538,7 @@ task test -- -race     # run tests with the race detector
 task test -- -run TestName -count=1 # run matching tests without cached results
 task lint              # run golangci-lint (including govet) and gohawk
 task lint -- -v        # pass verbose output to golangci-lint, then run gohawk
+task base-image        # check that the pinned container base image is still current
 task release           # check and publish tagged GitHub archives and GHCR container images
 ```
 
@@ -557,8 +558,9 @@ Override the install directory with `task install INSTALL_DIR=/path/to/bin`. `ta
 use the same `INSTALL_DIR` override when running from a custom location. It defaults to `-all`, or forwards the flags after `--` instead.
 
 `task release` requires HEAD to be exactly on a tag and the working tree to be clean, including untracked files. It checks that the tag is on `origin`
-at the same commit and that a GitHub token is available. It then runs `task check` before asking for confirmation and publishing archives to GitHub
-and multi-platform images to GHCR. The token also needs permission to publish packages, as described below.
+at the same commit and that a GitHub token is available. It then runs `task base-image` and `task check` before asking for confirmation and publishing
+archives to GitHub and multi-platform images to GHCR. The token also needs permission to publish packages, as described below.
+Run `task base-image` before tagging as well: a stale base image needs a commit that updates the pin, and the tag has to point to that commit.
 Without a terminal the prompt cancels the release unless `task -y` is used. Release never installs a binary or falls back to a snapshot.
 
 ### Release builds
@@ -573,8 +575,8 @@ Linux archives also contain the systemd unit and environment example from `deplo
 GoReleaser's built-in [Ko integration](https://goreleaser.com/customization/package/ko/) builds and publishes the Linux images directly to GHCR.
 It inherits the existing `linux` build's main package, static-build environment and version flags. It rebuilds the binary using those settings;
 the Go build cache avoids recompiling unchanged packages. Docker, Buildx and a separate `ko` executable are not required.
-The base image is pinned by digest in `.goreleaser.yaml` and nothing updates it automatically; before a release, compare it with the current digest
-from `crane digest gcr.io/distroless/static-debian13:nonroot`.
+The base image is pinned by digest in `.goreleaser.yaml` and nothing updates it automatically. `task base-image` compares the pin with the digest its tag
+points to now, using crane, and fails with the replacement value when they differ; `task release` runs it first.
 
 Validate the configuration and build a local snapshot of the release archives without publishing:
 

@@ -78,6 +78,30 @@ tasks:
       - golangci-lint run {{.CLI_ARGS}}
       - gohawk ./...
 
+  base-image:
+    desc: Check that the pinned container base image is still the current digest of its tag
+    silent: true
+    preconditions:
+      - sh: command -v crane >/dev/null
+        msg: crane is not installed; see Tools in the README
+    cmds:
+      - |
+        pinned="$(sed -nE 's/^[[:space:]]*base_image:[[:space:]]*([^[:space:]#]+).*/\1/p' .goreleaser.yaml)"
+        case "$pinned" in
+          *@sha256:*) ;;
+          *) echo "base_image in .goreleaser.yaml is not pinned by digest: ${pinned:-missing}" >&2; exit 1 ;;
+        esac
+        ref="${pinned%@*}"
+        current="$(crane digest "$ref")" || exit 1
+        if [ "$current" != "${pinned#*@}" ]; then
+          echo "The base image $ref has changed since it was pinned:" >&2
+          echo "  pinned:  ${pinned#*@}" >&2
+          echo "  current: $current" >&2
+          echo "Set base_image in .goreleaser.yaml to $ref@$current, commit, and tag that commit." >&2
+          exit 1
+        fi
+        echo "Base image $ref is current: $current"
+
   release:
     desc: Check and publish the tagged HEAD as GitHub archives and multi-platform container images
     vars:
@@ -93,6 +117,8 @@ tasks:
       - sh: '[ -n "$GITHUB_TOKEN" ] || gh auth token >/dev/null 2>&1'
         msg: No GitHub token; set GITHUB_TOKEN or log in with "gh auth login"
     cmds:
+      # First, so a stale base image fails before the complete check runs.
+      - task: base-image
       - task: check
       - task: publish
         vars:
