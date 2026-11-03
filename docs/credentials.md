@@ -88,6 +88,22 @@ Adjust the service flags in `ExecStart` before starting. Once authentication suc
 After replacing the encrypted secret or changing the application credential id, restart osmex: systemd's credential copy and osmex's loaded secret are refreshed
 only at startup. An application credential's secret cannot be changed; create a replacement credential and update its id and encrypted secret together.
 
+### The scrape password and TLS key under systemd
+
+The unit runs as a dynamic user, which cannot read a root-owned key or password file, so both reach osmex as credentials, like the secret. Encrypt
+the scrape password with the command above, using `cred=/etc/osmex/scrape-password.cred`, `--name=scrape-password` and the prompt
+`'osmex scrape password:'`. Install the key root-owned with mode 0600 and load it as it is: a tool that renews it keeps it in plain text anyway, and
+encrypting each renewal would need a hook. Then use the commented-out lines in [deploy/systemd/osmex.service](../deploy/systemd/osmex.service):
+
+```ini
+LoadCredential=tls.key:/etc/osmex/tls.key
+LoadCredentialEncrypted=scrape-password:/etc/osmex/scrape-password.cred
+ExecStart=/usr/local/bin/osmex -nova -cinder -neutron -listen-address=:9180 -listen-tls-cert-file=/etc/osmex/tls.crt -listen-tls-key-file=%d/tls.key -listen-auth-username=prometheus -listen-auth-password-file=%d/scrape-password
+```
+
+`%d` is the unit's credential directory. The certificate is public and is read from its own path, mode 0644. As with the secret, systemd's copies are
+made at start, so restart osmex after renewing the key or rotating the password; osmex's own reloading applies to files that change underneath it.
+
 For manual runs, `OS_APPLICATION_CREDENTIAL_SECRET` remains supported. Alternatively, set `OS_APPLICATION_CREDENTIAL_SECRET_FILE` to a readable plaintext
 secret file, such as a container secret; systemd is not required for file-based loading.
 
