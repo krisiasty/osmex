@@ -13,8 +13,8 @@ import (
 )
 
 // reloadInterval bounds how often the certificate files are checked and the password file is re-read, so there is no
-// stat on every handshake and no read on every rejected request. Neither runs on a timer: a renewed certificate is
-// picked up by the first handshake after the interval, a rotated password by the first rejected request after it.
+// stat on every handshake and no read on every request. Neither runs on a timer: a renewed certificate is picked up by
+// the first handshake after the interval, a rotated password by the first request after it.
 const reloadInterval = 30 * time.Second
 
 // Options describes the listener's TLS.

@@ -311,7 +311,32 @@ func TestBasicAuthFollowsARotatedPassword(t *testing.T) {
 	r.noPasswordsLogged()
 }
 
-// A burst of bad credentials costs one read per interval, not one per request.
+// Rotation revokes the old password even when nobody sends the new one: a client that only ever sends the old password
+// must not keep access because its requests match the password in memory.
+func TestBasicAuthRevokesTheOldPassword(t *testing.T) {
+	r := newRotating(t)
+	r.write(newPassword)
+	// Inside the interval since the last read, the file is not read, so the old password still works.
+	r.now = r.now.Add(reloadInterval - time.Second)
+	if got := r.scrape(oldPassword); got != http.StatusOK {
+		t.Fatalf("the old password inside the interval: %d, want 200", got)
+	}
+	for _, after := range []time.Duration{time.Second, 72 * time.Hour} {
+		r.now = r.now.Add(after)
+		if got := r.scrape(oldPassword); got != http.StatusUnauthorized {
+			t.Errorf("the old password %v later: %d, want 401", after, got)
+		}
+	}
+	if got := r.scrape(newPassword); got != http.StatusOK {
+		t.Errorf("the rotated password: %d, want 200", got)
+	}
+	if !strings.Contains(r.logs.String(), "scrape password rotated") {
+		t.Errorf("the rotation was not logged:\n%s", r.logs)
+	}
+	r.noPasswordsLogged()
+}
+
+// A burst of requests costs one read per interval, not one per request.
 func TestBasicAuthThrottlesRereads(t *testing.T) {
 	r := newRotating(t)
 

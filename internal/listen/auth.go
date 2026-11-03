@@ -17,9 +17,9 @@ func BasicAuth(next http.Handler, username string, password *secret.Credential, 
 	return newBasicAuth(username, password, log, time.Now).handler(next, exempt...)
 }
 
-// basicAuth checks credentials against a password that can rotate underneath it. A rejection re-reads the password
-// file, but at most once per reloadInterval across all requests: anyone who can reach the port decides when a request
-// arrives, and an unconditional re-read would turn every bad request into a file read.
+// basicAuth checks credentials against a password that can rotate underneath it. A request re-reads the password file,
+// but at most once per reloadInterval across all requests: anyone who can reach the port decides when a request
+// arrives, and an unconditional re-read would turn every request into a file read.
 type basicAuth struct {
 	username string
 	password *secret.Credential
@@ -55,25 +55,27 @@ func (a *basicAuth) handler(next http.Handler, exempt ...string) http.Handler {
 	})
 }
 
-// allow reports whether the credentials match, re-reading the password file first when they do not and a re-read is
-// due. A changed password is checked against the same request, so the first scrape with a rotated password succeeds.
+// allow reports whether the credentials match, re-reading the password file first when a re-read is due. The re-read
+// comes before the comparison whether or not the credentials match the password in memory: re-reading only after a
+// rejection would let the old password in for as long as nobody sent different credentials. A rotated password is thus
+// accepted, and the old one refused, from the first request after the interval.
 func (a *basicAuth) allow(user, pass string) bool {
-	if matches(user, pass, a.username, a.password.Value()) {
-		return true
+	if a.due() {
+		a.reload()
 	}
-	if !a.due() {
-		return false
-	}
+	return matches(user, pass, a.username, a.password.Value())
+}
+
+// reload re-reads the password file. A failed read keeps the password in memory: a half-written file must not lock out
+// a scraper that was working a moment ago.
+func (a *basicAuth) reload() {
 	changed, err := a.password.Reload()
 	switch {
 	case err != nil:
 		a.log.Warn("scrape password reload failed", "user", a.username, "err", err)
-		return false
-	case !changed:
-		return false
+	case changed:
+		a.log.Warn("scrape password rotated", "user", a.username)
 	}
-	a.log.Warn("scrape password rotated", "user", a.username)
-	return matches(user, pass, a.username, a.password.Value())
 }
 
 // due reports whether a re-read is allowed now, and claims it if so; claiming under the lock makes concurrent

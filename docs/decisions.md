@@ -157,12 +157,13 @@ would turn a health check into a restart loop, and the probes report only whethe
 the handshake refuses a client without a certificate before any path is known, so `-probe-address` serves the probes on a second, plain-HTTP
 listener that serves nothing else.
 
-### A rejected scrape re-reads the password, at most every 30 seconds
+### Requests re-read the password, at most every 30 seconds
 
-A mounted Kubernetes secret is updated in place, so the password is re-read when a request is rejected rather than only at startup. The re-read is
-limited to once every 30 seconds across all requests: anyone who can reach the port decides when a request arrives, and an unconditional re-read
-would make every bad request a file read. The certificate is checked for changes on the same interval, when a connection arrives, rather than on
-a timer.
+A mounted Kubernetes secret is updated in place, so the password is re-read while osmex runs rather than only at startup. The re-read happens before
+a request's credentials are checked, whether or not they match the password in memory: re-reading only after a rejection would let a client with the
+old password keep access for as long as nobody sent different credentials. It is limited to once every 30 seconds across all requests: anyone who
+can reach the port decides when a request arrives, and an unconditional re-read would make every request a file read. The certificate is checked for
+changes on the same interval, when a connection arrives, rather than on a timer.
 
 ### Readiness is a startup latch
 

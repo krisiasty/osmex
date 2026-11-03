@@ -156,10 +156,10 @@ osmex -nova -listen-address=:9180 -listen-tls-cert-file=/etc/osmex/tls.crt -list
 - TLS 1.2 is the minimum. The certificate and key are checked for changes at most every 30 seconds when a connection arrives, and reloaded when
   they change, so a renewal by cert-manager or another tool needs no restart. A pair that fails to load, such as a half-written one, keeps the
   previous certificate in use.
-- The password file loses trailing CR/LF characters. When a request is rejected, osmex re-reads the file, at most once every 30 seconds, and
-  checks the request again if the password changed, so a rotated Kubernetes secret is picked up without a restart. A scrape with the new password
-  that arrives within 30 seconds of the last re-read is refused until a later one triggers the next. A file that can't be read keeps the previous
-  password. Credentials are compared in constant time, and neither the password nor a failed attempt's credentials are logged.
+- The password file loses trailing CR/LF characters. The first request at least 30 seconds after the last read re-reads the file before its
+  credentials are checked, so a rotated Kubernetes secret is picked up without a restart: from that request on, the new password is accepted and
+  the old one refused. Until then, the old password still works and the new one is refused. A file that can't be read keeps the previous password.
+  Credentials are compared in constant time, and neither the password nor a failed attempt's credentials are logged.
 - A client certificate is required by the listener, not by a path, so a Kubernetes probe without one is refused with mutual TLS. Serve the
   probes on a separate plain-HTTP listener with `-probe-address`; it serves only `/livez` and `/readyz` and returns 404 for anything else.
 - Under systemd, the private key and password are stored encrypted with `systemd-creds` and loaded with `LoadCredentialEncrypted=`, whose copies are
