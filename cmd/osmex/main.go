@@ -16,23 +16,27 @@ import (
 )
 
 // version, commit and date are set at build time with -ldflags "-X main.version=... -X main.commit=... -X main.date=...".
-// date is when the binary was built, in RFC 3339 format.
+// date is the commit's time, in RFC 3339 format, rather than the build's: the same commit then builds the same binary.
 var (
 	version = "dev"
 	commit  = ""
 	date    = ""
 )
 
-// versionLine describes the build for -version. Without a commit from the build flags, it uses the one that the Go
-// toolchain recorded when building from a checkout; there is no fallback for the build date.
+// versionLine describes the build for -version. Without a commit from the build flags, it uses the commit and commit
+// time that the Go toolchain recorded when building from a checkout.
 func versionLine(info *debug.BuildInfo) string {
-	rev, built := commit, date
+	rev, committed := commit, date
 	if rev == "" && info != nil {
 		modified := false
 		for _, s := range info.Settings {
 			switch s.Key {
 			case "vcs.revision":
 				rev = s.Value
+			case "vcs.time":
+				if committed == "" {
+					committed = s.Value
+				}
 			case "vcs.modified":
 				modified = s.Value == "true"
 			}
@@ -44,10 +48,10 @@ func versionLine(info *debug.BuildInfo) string {
 	if rev == "" {
 		rev = "unknown"
 	}
-	if built == "" {
-		built = "unknown"
+	if committed == "" {
+		committed = "unknown"
 	}
-	return fmt.Sprintf("osmex %s (commit %s, built %s)", version, rev, built)
+	return fmt.Sprintf("osmex %s (commit %s, committed %s)", version, rev, committed)
 }
 
 func main() { os.Exit(run()) }
