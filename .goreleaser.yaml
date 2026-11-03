@@ -81,7 +81,7 @@ kos:
       # Prereleases and snapshots must not replace stable release aliases.
       - '{{ if and (not .IsSnapshot) (not .Prerelease) }}v{{ .Major }}.{{ .Minor }}{{ end }}'
       - '{{ if and (not .IsSnapshot) (not .Prerelease) }}latest{{ end }}'
-    labels:
+    labels: &oci
       org.opencontainers.image.title: "{{ .ProjectName }}"
       org.opencontainers.image.description: Project-scoped OpenStack exporter for Prometheus
       org.opencontainers.image.url: https://github.com/krisiasty/osmex
@@ -89,6 +89,9 @@ kos:
       org.opencontainers.image.version: "{{ .Version }}"
       org.opencontainers.image.revision: "{{ .FullCommit }}"
       org.opencontainers.image.licenses: Apache-2.0
+    # The same as manifest annotations. GHCR reads a multi-arch package's description and repository from the index's
+    # annotations, not from config labels, and the platform manifests would otherwise keep the base image's source.
+    annotations: *oci
 
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
