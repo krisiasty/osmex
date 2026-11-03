@@ -16,7 +16,7 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X main.version={{ .Version }} -X main.commit={{ .FullCommit }} -X main.date={{ .Date }}
+      - -X main.version={{ .Version }} -X main.commit={{ .FullCommit }} -X main.date={{ .CommitDate }}
   - id: linux
     main: ./cmd/osmex
     binary: osmex
@@ -29,7 +29,7 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X main.version={{ .Version }} -X main.commit={{ .FullCommit }} -X main.date={{ .Date }}
+      - -X main.version={{ .Version }} -X main.commit={{ .FullCommit }} -X main.date={{ .CommitDate }}
 
 archives:
   - id: darwin
@@ -67,7 +67,8 @@ kos:
     # tag has moved and prints the new value. Keep this on one line: the task reads it with sed.
     base_image: gcr.io/distroless/static-debian13:nonroot@sha256:25ac8f0c3b2334a9eb05452266bd4697864a8c8ef0ef71e5e6480d7f92868329
     user: "65532:65532"
-    # The commit time, so the same commit always produces the same image digest.
+    # The commit time, like main.date in the build's ldflags: together they make the same commit and base image produce
+    # the same image digest.
     creation_time: "{{ .CommitTimestamp }}"
     platforms:
       - linux/amd64

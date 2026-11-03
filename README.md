@@ -547,7 +547,7 @@ in sequence, stopping on failure. The test task is reused, so tests run once wit
 The tidy check reports differences without modifying `go.mod`. Check requires GoReleaser, golangci-lint, gohawk, and govulncheck on `PATH`;
 the vulnerability scan needs access to the Go vulnerability database.
 
-`task build` uses GoReleaser to build only the current platform, with the release flags and version, commit, and build date. Native output goes in
+`task build` uses GoReleaser to build only the current platform, with the release flags and version, commit, and commit date. Native output goes in
 `build/<os>_<arch>/osmex`; a generated local configuration puts GoReleaser's intermediate output in `build/dist/`, keeping release artifacts in `dist/` intact.
 Compilation is skipped when the binary exists and its inputs are not newer; the inputs include Go source, module files, build configuration and Git refs.
 Use `task --force build` to force a rebuild.
@@ -568,8 +568,9 @@ Without a terminal the prompt cancels the release unless `task -y` is used. Rele
 The [GoReleaser configuration](.goreleaser.yaml) is adapted from
 [videocheck](https://github.com/krisiasty/videocheck/blob/main/.goreleaser.yaml).
 It builds binaries for macOS on arm64 and Linux on amd64 and arm64, and embeds the version shown by `-version` and in `openstack_exporter_build_info`.
-`-version` also prints the commit and the build date, for example `osmex v1.2.0 (commit 1a2b3c…, built 2026-10-24T18:00:00Z)`. Builds without these flags fall back to the
-commit that Go records when building from a checkout, and show `unknown` for anything missing.
+`-version` also prints the commit and its date, for example `osmex v1.2.0 (commit 1a2b3c…, committed 2026-10-24T18:00:00Z)`. The commit date, not the
+build time, is embedded so that the same commit builds the same binary and container image. Builds without these flags fall back to the commit and commit
+date that Go records when building from a checkout, and show `unknown` for anything missing.
 Releases include tar.gz archives with the README, the license, the credentials guide, and SHA-256 checksums.
 Linux archives also contain the systemd unit and environment example from `deploy/systemd/`.
 GoReleaser's built-in [Ko integration](https://goreleaser.com/customization/package/ko/) builds and publishes the Linux images directly to GHCR.
