@@ -162,8 +162,8 @@ osmex -nova -listen-address=:9180 -listen-tls-cert-file=/etc/osmex/tls.crt -list
   password. Credentials are compared in constant time, and neither the password nor a failed attempt's credentials are logged.
 - A client certificate is required by the listener, not by a path, so a Kubernetes probe without one is refused with mutual TLS. Serve the
   probes on a separate plain-HTTP listener with `-probe-address`; it serves only `/livez` and `/readyz` and returns 404 for anything else.
-- Under systemd, the key and password are loaded with `LoadCredential=` and `LoadCredentialEncrypted=`, whose copies are made at start, so a renewed
-  key or rotated password reaches osmex only after `systemctl restart osmex`. See
+- Under systemd, the private key and password are stored encrypted with `systemd-creds` and loaded with `LoadCredentialEncrypted=`, whose copies are
+  made at start, so a renewed key or rotated password reaches osmex only after `systemctl restart osmex`. See
   [the scrape password and TLS key](docs/credentials.md#the-scrape-password-and-tls-key-under-systemd) and the commented example in
   [deploy/systemd/osmex.service](deploy/systemd/osmex.service).
 
